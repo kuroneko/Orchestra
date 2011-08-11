@@ -16,7 +16,7 @@ const (
 
 var	logWriter  *syslog.Writer = nil
 
-func SetLogName(name straing) {
+func SetLogName(name string) {
 	if nil != logWriter {
 		logWriter.Close()
 		logWriter = nil
