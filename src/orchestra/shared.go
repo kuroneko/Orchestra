@@ -14,7 +14,7 @@ const (
 	DefaultHTTPPort = 2259
 )
 
-var	logWriter, _ = syslog.New(syslog.LOG_DEBUG, "orchestra")
+var	logWriter  *syslog.Writer = nil
 
 func SetLogName(name string) {
 	if nil != logWriter {
@@ -28,19 +28,27 @@ func SetLogName(name string) {
 
 
 func Debug(format string, args ...interface{}) {
-	logWriter.Debug(fmt.Sprintf(format, args...))
+	if nil != logWriter {
+		logWriter.Debug(fmt.Sprintf(format, args...))
+	}
 }
 
 func Info(format string, args ...interface{}) {
-	logWriter.Info(fmt.Sprintf(format, args...))
+	if nil != logWriter {
+		logWriter.Info(fmt.Sprintf(format, args...))
+	}
 }
 
 func Warn(format string, args ...interface{}) {
-	logWriter.Warning(fmt.Sprintf(format, args...))
+	if nil != logWriter {
+		logWriter.Warning(fmt.Sprintf(format, args...))
+	}
 }
 
 func Fail(mesg string, args ...interface {}) {
-	logWriter.Err(fmt.Sprintf(mesg, args...))
+	if nil != logWriter {
+		logWriter.Err(fmt.Sprintf(mesg, args...))
+	}
 	fmt.Fprintf(os.Stderr, "ERR: "+mesg+"\n", args...);
 	os.Exit(1)
 }	
