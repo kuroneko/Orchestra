@@ -93,6 +93,9 @@ func ConfigLoad() {
 		idx++
 	}
 	ClientUpdateKnown(authorisedHosts)
+
+	// set the spool directory
+	SetSpoolDirectory(GetStringOpt("conductor state path"))
 }
 
 

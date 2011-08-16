@@ -29,6 +29,9 @@ func main() {
 	// do an initial configuration load
 	ConfigLoad()
 
+	// Build the Spool Tree if necessary
+	MakeSpoolDir()
+
 	// start the master dispatch system
 	InitDispatch()
 	defer CleanDispatch()

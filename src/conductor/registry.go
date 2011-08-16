@@ -137,6 +137,8 @@ func manageRegistry() {
 				req.job.updateState()
 				// and register the job
 				jobRegister[req.job.Id] = req.job
+				// force a queue update.
+				req.job.UpdateJobInformation()
 				resp.success = true
 			} else {
 				resp.success = false
@@ -153,6 +155,8 @@ func manageRegistry() {
 			resp.success = exists
 			if exists {
 				job.results[req.hostname] = req.tresp
+				// force a queue update.
+				job.UpdateJobInformation()
 			}
 		case requestGetJobResult:
 			job, exists := jobRegister[req.id]
@@ -187,6 +191,8 @@ func manageRegistry() {
 					copy(newplayers[idx:len(job.Players)-1], job.Players[idx+1:len(job.Players)])
 					job.Players = newplayers
 					job.updateState()
+					// force a queue update.
+					job.UpdateJobInformation()
 				} else {
 					resp.success = false
 				}
@@ -198,6 +204,8 @@ func manageRegistry() {
 			resp.success = exists
 			if exists {
 				job.updateState()
+				// force a queue update.
+				job.UpdateJobInformation()
 			}
 		}
 		if req.responseChannel != nil {

@@ -5,6 +5,10 @@ package main
 
 import (
 	"sort"
+	"json"
+	"path"
+	"os"
+	o "orchestra"
 )
 
 type JobRequest struct {
@@ -66,4 +70,33 @@ func (req *JobRequest) Valid() bool {
 		return false
 	}
 	return true
+}
+
+func (req *JobRequest) FilenameForSpool() string {
+	if (req.State == JOB_PENDING) {
+		return path.Join(GetSpoolDirectory(), "active", FilenameForJobId(req.Id))
+	}
+	return path.Join(GetSpoolDirectory(), "finished", FilenameForJobId(req.Id))
+}
+
+
+func doSerialisation(fh *os.File, buf []byte) {
+	defer fh.Close()
+	fh.Write(buf)
+}
+
+func (req *JobRequest) UpdateJobInformation()  {
+	// first up, clean up old state.
+	UnlinkNodesForJobId(req.Id)
+	
+	outpath := req.FilenameForSpool()
+	
+	fh, err := os.OpenFile(outpath, os.O_WRONLY|os.O_CREATE|os.O_EXCL,  0600)
+	if err != nil {
+		o.Warn("Could not create persistence file %s: %s", outpath, err)
+		return
+	}
+	buf, err := json.MarshalIndent(req, "", "  ")
+	o.MightFail(err, "Failed to marshal job %d", req.Id)
+	go doSerialisation(fh, buf)
 }
