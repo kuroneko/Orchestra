@@ -5,11 +5,15 @@ package main
 
 import (
 	"flag"
+	"os"
 	o	"orchestra"
 )
 
 var (
 	ConfigFile = flag.String("config-file", "/etc/orchestra/conductor.conf", "File containing the conductor configuration")
+	// this is used a lot for marshalling. I just can't stuff it
+	// anywhere else.
+	InvalidValueError = os.NewError("Invalid value")
 )
 
 

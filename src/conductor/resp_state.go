@@ -71,3 +71,42 @@ func (rs ResponseState) UnmarshalJSON(in []byte) (err os.Error) {
 	return nil
 }
 
+func (rs ResponseState) Finished() bool {
+	switch rs {
+	case RESP_FINISHED:
+		fallthrough
+	case RESP_FAILED:
+		fallthrough
+	case RESP_FAILED_UNKNOWN_SCORE:
+		fallthrough
+	case RESP_FAILED_HOST_ERROR:
+		fallthrough
+	case RESP_FAILED_UNKNOWN:
+		return true
+	}
+	return false
+}
+
+// true if the response says the task failed.  false otherwise.
+func (rs ResponseState) Failed() bool {
+	switch rs {
+	case RESP_RUNNING:
+		fallthrough
+	case RESP_FINISHED:
+		return false
+	}
+	return true
+}
+
+// true if the task can be tried.
+// precond:  DidFail is true, job is a ONE_OF job.
+// must return false otherwise.
+func (rs ResponseState) CanRetry() bool {
+	switch rs {
+	case RESP_FAILED_UNKNOWN_SCORE:
+		fallthrough
+	case RESP_FAILED_HOST_ERROR:
+		return true
+	}
+	return false
+}
