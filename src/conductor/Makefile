@@ -16,6 +16,11 @@ GOFILES=\
 	signal.go\
 	config.go\
 	audience.go\
+	job_scope.go\
+	job_state.go\
+	resp_state.go\
+	task_state.go\
+	request.go\
 
 include $(GOROOT)/src/Make.cmd
 

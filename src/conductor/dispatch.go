@@ -94,16 +94,16 @@ func nextRequestId() uint64 {
 	return atomic.AddUint64(&lastId, 1)
 }
 
-func NewRequest() (req *o.JobRequest) {
-	req = o.NewJobRequest()
+func NewRequest() (req *JobRequest) {
+	req = NewJobRequest()
 
 	return req
 }
 
 const messageBuffer = 10
 
-var newJob		= make(chan *o.JobRequest, messageBuffer)
-var rqTask		= make(chan *o.TaskRequest, messageBuffer)
+var newJob		= make(chan *JobRequest, messageBuffer)
+var rqTask		= make(chan *TaskRequest, messageBuffer)
 var playerIdle		= make(chan *ClientInfo, messageBuffer)
 var playerDead		= make(chan *ClientInfo, messageBuffer)
 var statusRequest	= make(chan(chan *QueueInformation))
@@ -116,7 +116,7 @@ func PlayerDied(player *ClientInfo) {
 	playerDead <- player
 }
 
-func DispatchTask(task *o.TaskRequest) {
+func DispatchTask(task *TaskRequest) {
 	rqTask <- task
 }
 
@@ -145,13 +145,13 @@ func CleanDispatch() {
 	saveLastId()
 }
 
-func QueueJob(job *o.JobRequest) {
+func QueueJob(job *JobRequest) {
 	/* first, allocate the Job it's ID */
 	job.Id = nextRequestId()
 	/* first up, split the job up into it's tasks. */
 	job.Tasks = job.MakeTasks()
 	/* add it to the registry */
-	o.JobAdd(job)
+	JobAdd(job)
 	/* an enqueue all of the tasks */
 	for i := range job.Tasks {
 		DispatchTask(job.Tasks[i])
@@ -175,7 +175,7 @@ func masterDispatch() {
 					pq.PushBack(player)
 					break;
 				}
-				t,_ := i.Value.(*o.TaskRequest)
+				t,_ := i.Value.(*TaskRequest)
 				if t.IsTarget(player.Player) {
 					/* Found a valid job. Send it to the player, and remove it from our pending 
 					 * list */

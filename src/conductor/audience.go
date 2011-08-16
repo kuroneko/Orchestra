@@ -71,40 +71,40 @@ func handleAudienceRequest(c net.Conn) {
 			o.Warn("Malformed Status message talking to audience. Missing Job ID")
 			return
 		}
-		job := o.JobGet(*outobj.Id)
+		job := JobGet(*outobj.Id)
 		jresp := new([2]interface{})
 		if nil != job {
 			jresp[0] = "OK"
 			iresp := NewJsonStatusResponse()
 			switch job.State {
-			case o.JOB_PENDING:
+			case JOB_PENDING:
 				iresp.Status = "PENDING"
-			case o.JOB_SUCCESSFUL:
+			case JOB_SUCCESSFUL:
 				iresp.Status = "OK"
-			case o.JOB_FAILED_PARTIAL:
+			case JOB_FAILED_PARTIAL:
 				iresp.Status = "PARTIAL_FAIL"
-			case o.JOB_FAILED:
+			case JOB_FAILED:
 				iresp.Status = "FAIL"
 			default:
 				o.Fail("Blargh.  %d is an unknown job state!", job.State)
 			}
-			resnames := o.JobGetResultNames(*outobj.Id)
+			resnames := JobGetResultNames(*outobj.Id)
 			for i := range resnames {
-				tr := o.JobGetResult(*outobj.Id, resnames[i])
+				tr := JobGetResult(*outobj.Id, resnames[i])
 				if nil != tr {
 					presp := NewJsonPlayerStatus()
 					switch tr.State {
-					case o.RESP_RUNNING:
+					case RESP_RUNNING:
 						presp.Status = "PENDING"
-					case o.RESP_FINISHED:
+					case RESP_FINISHED:
 						presp.Status = "OK"
-					case o.RESP_FAILED:
+					case RESP_FAILED:
 						presp.Status = "FAIL"
-					case o.RESP_FAILED_UNKNOWN_SCORE:
+					case RESP_FAILED_UNKNOWN_SCORE:
 						presp.Status = "UNK_SCORE"
-					case o.RESP_FAILED_HOST_ERROR:
+					case RESP_FAILED_HOST_ERROR:
 						presp.Status = "HOST_ERROR"
-					case o.RESP_FAILED_UNKNOWN:
+					case RESP_FAILED_UNKNOWN:
 						presp.Status = "UNKNOWN_FAILURE"
 					}
 					for k,v:=range(tr.Response) {
@@ -148,9 +148,9 @@ func handleAudienceRequest(c net.Conn) {
 		job.Score = *outobj.Score
 		switch (*outobj.Scope) {
 		case "one":
-			job.Scope = o.SCOPE_ONEOF
+			job.Scope = SCOPE_ONEOF
 		case "all":
-			job.Scope = o.SCOPE_ALLOF
+			job.Scope = SCOPE_ALLOF
 		default:
 			sendQueueFailureResponse("Invalid Scope", enc)
 			return
@@ -168,7 +168,7 @@ func handleAudienceRequest(c net.Conn) {
 	_ = enc
 }
 
-func sendQueueSuccessResponse(job *o.JobRequest, enc *json.Encoder) {
+func sendQueueSuccessResponse(job *JobRequest, enc *json.Encoder) {
 	resp := make([]interface{},2)
 	resperr := new(string)
 	*resperr = "OK"

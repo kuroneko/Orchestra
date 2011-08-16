@@ -25,9 +25,9 @@ type ClientInfo struct {
 	PktOutQ		chan *o.WirePkt
 	PktInQ		chan *o.WirePkt
 	abortQ		chan int
-	TaskQ		chan *o.TaskRequest
+	TaskQ		chan *TaskRequest
 	connection	net.Conn
-	pendingTasks	map[uint64]*o.TaskRequest
+	pendingTasks	map[uint64]*TaskRequest
 }
 
 func NewClientInfo() (client *ClientInfo) {
@@ -35,7 +35,7 @@ func NewClientInfo() (client *ClientInfo) {
 	client.abortQ = make(chan int, 2)
 	client.PktOutQ = make(chan *o.WirePkt, OutputQueueDepth)
 	client.PktInQ = make(chan *o.WirePkt)
-	client.TaskQ = make(chan *o.TaskRequest)
+	client.TaskQ = make(chan *TaskRequest)
 
 	return client
 }
@@ -70,7 +70,7 @@ func (client *ClientInfo) sendNow(p *o.WirePkt) {
 	}
 }
 
-func (client *ClientInfo) SendTask(task *o.TaskRequest) {
+func (client *ClientInfo) SendTask(task *TaskRequest) {
 	tr := task.Encode()
 	p, err := o.Encode(tr)
 	o.MightFail(err, "Couldn't encode task for client.")
@@ -78,25 +78,25 @@ func (client *ClientInfo) SendTask(task *o.TaskRequest) {
 	task.RetryTime = time.Nanoseconds() + RetryDelay
 }
 
-func (client *ClientInfo) GotTask(task *o.TaskRequest) {
+func (client *ClientInfo) GotTask(task *TaskRequest) {
 	/* first up, look at the task state */
 	switch (task.State) {
-	case o.TASK_QUEUED:
+	case TASK_QUEUED:
 		fallthrough
-	case o.TASK_PENDINGRESULT:
+	case TASK_PENDINGRESULT:
 		/* this is a new task.  We should send it straight */
 		task.Player = client.Player
-		task.State = o.TASK_PENDINGRESULT
-		client.pendingTasks[task.Job.Id] = task
+		task.State = TASK_PENDINGRESULT
+		client.pendingTasks[task.job.Id] = task
 		client.SendTask(task)
-	case o.TASK_FINISHED:
+	case TASK_FINISHED:
 		/* discard.  We don't care about tasks that are done. */		
 	}
 }
 
 // reset the task state so it can be requeued.
-func CleanTask(task *o.TaskRequest) {
-	task.State = o.TASK_QUEUED
+func CleanTask(task *TaskRequest) {
+	task.State = TASK_QUEUED
 	task.Player = ""
 }
 
@@ -199,43 +199,43 @@ func handleIllegal(client *ClientInfo, message interface{}) {
 
 func handleResult(client *ClientInfo, message interface{}){
 	jr, _ := message.(*o.ProtoTaskResponse)
-	r := o.ResponseFromProto(jr)
+	r := ResponseFromProto(jr)
 	// at this point in time, we only care about terminal
 	// condition codes.  a Job that isn't finished is just
 	// prodding us back to let us know it lives.
 	if r.IsFinished() {
-		job := o.JobGet(r.Id)
+		job := JobGet(r.id)
 		if nil == job {
-			o.Warn("Client %s: NAcking for Job %d - couldn't find job data.", client.Name(), r.Id)
-			nack := o.MakeNack(r.Id)
+			o.Warn("Client %s: NAcking for Job %d - couldn't find job data.", client.Name(), r.id)
+			nack := o.MakeNack(r.id)
 			client.sendNow(nack)
 		} else {
-			job := o.JobGet(r.Id)
+			job := JobGet(r.id)
 			if job != nil {
 				o.Debug("Got Response.  Acking.")
 				/* if the job exists, Ack it. */
-				ack := o.MakeAck(r.Id)
+				ack := o.MakeAck(r.id)
 				client.sendNow(ack)
 			}
 			// now, we only accept the results if we were
 			// expecting the results (ie: it was pending)
 			// and expunge the task information from the
 			// pending list so we stop bugging the client for it.
-			task, exists := client.pendingTasks[r.Id]
+			task, exists := client.pendingTasks[r.id]
 			if exists {
 				// store the result.
-				o.JobAddResult(client.Player, r)
+				JobAddResult(client.Player, r)
 
 				// next, work out if the job is a retryable failure or not
 				var didretry bool = false
 
 				if r.DidFail() {
-					o.Info("Client %s reports failure for Job %d", client.Name(), r.Id)
+					o.Info("Client %s reports failure for Job %d", client.Name(), r.id)
 					if r.CanRetry() {
-						job := o.JobGet(r.Id)
-						if job.Scope == o.SCOPE_ONEOF {
+						job := JobGet(r.id)
+						if job.Scope == SCOPE_ONEOF {
 							// right, we're finally deep enough to work out what's going on!
-							o.JobDisqualifyPlayer(r.Id, client.Player)
+							JobDisqualifyPlayer(r.id, client.Player)
 							if len(job.Players) >= 1 {
 								// still players left we can try?  then go for it!
 								CleanTask(task)
@@ -247,12 +247,12 @@ func handleResult(client *ClientInfo, message interface{}){
 				}
 				if !didretry {
 					// if we didn't retry, the task needs to be marked as finished.
-					task.State = o.TASK_FINISHED
+					task.State = TASK_FINISHED
 				}
 				// update the job state.
-				o.JobReviewState(r.Id)
+				JobReviewState(r.id)
 
-				client.pendingTasks[r.Id] = nil, false
+				client.pendingTasks[r.id] = nil, false
 			}
 		}
 	}
@@ -274,7 +274,7 @@ func clientLogic(client *ClientInfo) {
 	loop := true
 	for loop {
 		var	retryWait <-chan int64 = nil
-		var	retryTask *o.TaskRequest = nil
+		var	retryTask *TaskRequest = nil
 		if (client.Player != "") {
 			var waitTime int64 = 0
 			var now int64 = 0
