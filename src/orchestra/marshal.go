@@ -15,6 +15,38 @@ var (
 	ErrObjectTooLarge = os.NewError("Encoded Object exceeds maximum encoding size")
 )
 
+/* ugh ugh ugh.  As much as I love protocol buffers, not having maps
+ * as a native type is a PAIN IN THE ASS.
+ *
+ * Here's some common code to convert my K/V format in protocol
+ * buffers to and from native Go structures.
+*/
+func MapFromProtoJobParameters(parray []*ProtoJobParameter) (mapparam map[string]string) {
+	mapparam = make(map[string]string)
+
+	for p := range parray {
+		mapparam[*(parray[p].Key)] = *(parray[p].Value)
+	}
+
+	return mapparam
+}
+
+func ProtoJobParametersFromMap(mapparam map[string]string) (parray []*ProtoJobParameter) {
+	parray = make([]*ProtoJobParameter, len(mapparam))
+	i := 0
+	for k,v := range mapparam {
+		arg := new(ProtoJobParameter)
+		arg.Key = proto.String(k)
+		arg.Value = proto.String(v)
+		parray[i] = arg
+		i++
+	}
+
+	return parray
+}
+
+
+
 func (p *WirePkt) Decode() (obj interface{}, err os.Error) {
 	switch (p.Type) {
 	case TypeNop:

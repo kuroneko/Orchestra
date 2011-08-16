@@ -8,7 +8,6 @@ GOFILES=\
 	wire.go\
 	marshal.go\
 	shared.go\
-	request.go\
 	registry.go\
 
 include $(GOROOT)/src/Make.pkg
