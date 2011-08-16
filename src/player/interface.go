@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	interfaces	= make(map[string]func(*o.JobRequest)(ScoreInterface))
+	interfaces	= make(map[string]func(*TaskRequest)(ScoreInterface))
 )
 
 type ExecutionEnvironment struct {
@@ -53,7 +53,7 @@ func HasInterface(ifname string) bool {
 	return exists
 }
 
-func RegisterInterface(ifname string, initfunc func(*o.JobRequest)(ScoreInterface)) {
+func RegisterInterface(ifname string, initfunc func(*TaskRequest)(ScoreInterface)) {
 	_, exists := interfaces[ifname]
 	if exists {
 		o.Assert("Multiple attempts to register %s interface", ifname)
@@ -61,8 +61,8 @@ func RegisterInterface(ifname string, initfunc func(*o.JobRequest)(ScoreInterfac
 	interfaces[ifname] = initfunc
 }
 
-func NewScoreInterface(job *o.JobRequest) (iface ScoreInterface) {
-	score, exists := Scores[job.Score]
+func NewScoreInterface(task *TaskRequest) (iface ScoreInterface) {
+	score, exists := Scores[task.Score]
 	if !exists {
 		return nil
 	}
@@ -71,7 +71,7 @@ func NewScoreInterface(job *o.JobRequest) (iface ScoreInterface) {
 	}
 	ifinit, _ := interfaces[score.Interface]
 	
-	iface = ifinit(job)
+	iface = ifinit(task)
 
 	return iface
 }

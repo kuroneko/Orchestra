@@ -41,46 +41,47 @@ var (
 	unacknowledgedQueue	= list.New()
 	newConnection		= make(chan *NewConnectionInfo)
 	pendingTaskRequest	= false
+	InvalidValueError	= os.NewError("Invalid value")
 )
 
-func getNextPendingJob() (job *o.JobRequest) {
+func getNextPendingTask() (task *TaskRequest) {
 	e := pendingQueue.Front()
 	if e != nil {
-		job, _ = e.Value.(*o.JobRequest)
+		task, _ = e.Value.(*TaskRequest)
 		pendingQueue.Remove(e)
 	}
-	return job
+	return task
 }
 
-func appendPendingJob(job *o.JobRequest) {
+func appendPendingTask(task *TaskRequest) {
 	pendingTaskRequest = false
-	pendingQueue.PushBack(job)
+	pendingQueue.PushBack(task)
 }
 
-func getNextUnacknowledgedResponse() (resp *o.TaskResponse) {
+func getNextUnacknowledgedResponse() (resp *TaskResponse) {
 	e := unacknowledgedQueue.Front()
 	if e != nil {
-		resp, _ = e.Value.(*o.TaskResponse)
+		resp, _ = e.Value.(*TaskResponse)
 		unacknowledgedQueue.Remove(e)
 	}
 	return resp
 }
 
-func appendUnacknowledgedResponse(resp *o.TaskResponse) {
+func appendUnacknowledgedResponse(resp *TaskResponse) {
 	resp.RetryTime = time.Nanoseconds() + RetryDelay
 	unacknowledgedQueue.PushBack(resp)
 }
 
 func acknowledgeResponse(jobid uint64) {
 	for e := unacknowledgedQueue.Front(); e != nil; e = e.Next() {
-		resp := e.Value.(*o.TaskResponse)
-		if resp.Id == jobid {
+		resp := e.Value.(*TaskResponse)
+		if resp.id == jobid {
 			unacknowledgedQueue.Remove(e)
 		}
 	}
 }
 
-func sendResponse(c net.Conn, resp *o.TaskResponse) {
+func sendResponse(c net.Conn, resp *TaskResponse) {
 	//FIXME: update retry time on Response
 	o.Debug("Sending Response!")
 	ptr := resp.Encode()
@@ -97,7 +98,7 @@ func sendResponse(c net.Conn, resp *o.TaskResponse) {
 	}
 }
 
-func prequeueResponse(resp *o.TaskResponse) {
+func prequeueResponse(resp *TaskResponse) {
 	unacknowledgedQueue.PushFront(resp)
 }
 
@@ -130,25 +131,25 @@ func handleRequest(c net.Conn, message interface{}) {
 	if !ok {
 		o.Assert("CC stuffed up - handleRequest got something that wasn't a ProtoTaskRequest.")
 	}
-	job := o.JobFromProto(ptr)
-	/* search the registry for the job */
-	o.Debug("Request for Job.ID %d", job.Id)
-	existing := o.JobGet(job.Id)
+	task := TaskFromProto(ptr)
+	/* search the registry for the task */
+	o.Debug("Request for Job.ID %d", task.Id)
+	existing := TaskGet(task.Id)
 	if nil != existing {
 		if (existing.MyResponse.IsFinished()) {
-			o.Debug("job%d: Resending Response", job.Id)
+			o.Debug("job%d: Resending Response", task.Id)
 			sendResponse(c, existing.MyResponse)
 		}
 	} else {
 		// check to see if we have the score
 		// add the Job to our Registry
-		job.MyResponse = o.NewTaskResponse()
-		job.MyResponse.Id = job.Id
-		job.MyResponse.State = o.RESP_PENDING		
-		o.JobAdd(job)
-		o.Info("Added New Job %d to our local registry", job.Id)
+		task.MyResponse = NewTaskResponse()
+		task.MyResponse.id = task.Id
+		task.MyResponse.State = RESP_PENDING		
+		TaskAdd(task)
+		o.Info("Added New Task (Job ID %d) to our local registry", task.Id)
 		// and then push it onto the pending job list so we know it needs actioning.
-		appendPendingJob(job)
+		appendPendingTask(task)
 	}
 }
 
@@ -225,8 +226,8 @@ func connectMe(initialDelay int64) {
 
 func ProcessingLoop() {
 	var	conn			net.Conn		= nil
-	var     nextRetryResp		*o.TaskResponse 	= nil
-	var	jobCompletionChan	<-chan *o.TaskResponse	= nil
+	var     nextRetryResp		*TaskResponse 		= nil
+	var	taskCompletionChan	<-chan *TaskResponse	= nil
 	var	connectDelay		int64			= 0
 	var	doScoreReload		bool			= false
 	// kick off a new connection attempt.
@@ -253,10 +254,10 @@ func ProcessingLoop() {
 				retryChan = time.After(retryDelay)
 			}
 		}
-		if jobCompletionChan == nil {
-			nextJob := getNextPendingJob()
-			if nextJob != nil {
-				jobCompletionChan = ExecuteJob(nextJob)
+		if taskCompletionChan == nil {
+			nextTask := getNextPendingTask()
+			if nextTask != nil {
+				taskCompletionChan = ExecuteTask(nextTask)
 			} else {
 				if conn != nil && !pendingTaskRequest {
 					o.Debug("Asking for trouble")
@@ -269,8 +270,8 @@ func ProcessingLoop() {
 		}
 		select {
 		// Currently executing job finishes.
-		case newresp := <- jobCompletionChan:
-			o.Debug("Job %d has completed with State %d\n", newresp.Id, newresp.State)
+		case newresp := <- taskCompletionChan:
+			o.Debug("job%d: Completed with State %s\n", newresp.id, newresp.State)
 			// preemptively set a retrytime.
 			newresp.RetryTime = time.Nanoseconds()
 			// ENOCONN - sub it in as our next retryresponse, and prepend the old one onto the queue.
@@ -278,10 +279,10 @@ func ProcessingLoop() {
 				if nil != nextRetryResp {
 					prequeueResponse(nextRetryResp)
 				}
-				o.Debug("job%d: Queuing Initial Response", newresp.Id)
+				o.Debug("job%d: Queuing Initial Response", newresp.id)
 				nextRetryResp = newresp
 			} else {
-				o.Debug("job%d: Sending Initial Response", newresp.Id)
+				o.Debug("job%d: Sending Initial Response", newresp.id)
 				sendResponse(conn, newresp)
 			}
 			if doScoreReload {
@@ -289,7 +290,7 @@ func ProcessingLoop() {
 				LoadScores()
 				doScoreReload = false
 			}
-			jobCompletionChan = nil
+			taskCompletionChan = nil
 		// If the current unacknowledged response needs a retry, send it.
 		case <-retryChan:
 			sendResponse(conn, nextRetryResp)
@@ -341,7 +342,7 @@ func ProcessingLoop() {
 			// fortunately this is actually completely safe as 
 			// long as nobody's currently executing.
 			// who'd have thunk it?
-			if jobCompletionChan == nil {
+			if taskCompletionChan == nil {
 				o.Info("Reloading scores")
 				LoadScores()
 			} else {

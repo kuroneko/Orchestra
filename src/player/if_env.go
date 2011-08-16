@@ -4,10 +4,6 @@
 
 package main
 
-import (
-	o "orchestra"
-)
-
 const (
 	envEnvironmentPrefix = "ORC_"
 )
@@ -17,12 +13,12 @@ func init() {
 }
 
 type EnvInterface struct {
-	job	*o.JobRequest
+	task	*TaskRequest
 }
 
-func newEnvInterface(job *o.JobRequest) (iface ScoreInterface) {
+func newEnvInterface(task *TaskRequest) (iface ScoreInterface) {
 	ei := new(EnvInterface)
-	ei.job = job
+	ei.task = task
 
 	return ei
 }
@@ -34,7 +30,7 @@ func (ei *EnvInterface) Prepare() bool {
 
 func (ei *EnvInterface) SetupProcess() (ee *ExecutionEnvironment) {
 	ee = NewExecutionEnvironment()
-	for k,v := range ei.job.Params {
+	for k,v := range ei.task.Params {
 		ee.Environment[envEnvironmentPrefix+k] = v
 	}
 

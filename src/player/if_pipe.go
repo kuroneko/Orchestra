@@ -23,13 +23,13 @@ func init() {
 }
 
 type PipeInterface struct {
-	job	*o.JobRequest
+	task	*TaskRequest
 	pipew	*os.File
 }
 
-func newPipeInterface(job *o.JobRequest) (iface ScoreInterface) {
+func newPipeInterface(task *TaskRequest) (iface ScoreInterface) {
 	ei := new(PipeInterface)
-	ei.job = job
+	ei.task = task
 
 	return ei
 }
@@ -37,7 +37,7 @@ func newPipeInterface(job *o.JobRequest) (iface ScoreInterface) {
 
 // pipeListener is the goroutine that sits on the stdout pipe and
 // processes what it sees.
-func pipeListener(job *o.JobRequest, outpipe *os.File) {
+func pipeListener(task *TaskRequest, outpipe *os.File) {
 	defer outpipe.Close()
 
 	r := bufio.NewReader(outpipe)
@@ -53,7 +53,7 @@ func pipeListener(job *o.JobRequest, outpipe *os.File) {
 		linein := string(lb)
 		if strings.Index(linein, "=") >= 0 {
 			bits := strings.SplitN(linein, "=", 2)
-			job.MyResponse.Response[bits[0]] = bits[1]
+			task.MyResponse.Response[bits[0]] = bits[1]
 		}
 	}
 }
@@ -68,14 +68,14 @@ func (ei *PipeInterface) Prepare() bool {
 	ei.pipew = lw
 
 	// start the pipe listener
-	go pipeListener(ei.job, lr)
+	go pipeListener(ei.task, lr)
 
 	return true
 }
 
 func (ei *PipeInterface) SetupProcess() (ee *ExecutionEnvironment) {
 	ee = NewExecutionEnvironment()
-	for k,v := range ei.job.Params {
+	for k,v := range ei.task.Params {
 		ee.Environment[pipeEnvironmentPrefix+k] = v
 	}
 	ee.Files = make([]*os.File, 2)

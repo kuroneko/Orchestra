@@ -30,7 +30,7 @@ type ScoreInfo struct {
 
 type ScoreExecution struct {
 	Score	*ScoreInfo
-	Job	*o.JobRequest
+	Task	*TaskRequest
 }
 	
 

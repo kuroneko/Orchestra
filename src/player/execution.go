@@ -9,9 +9,9 @@ import (
 	o "orchestra"
 )
 
-func ExecuteJob(job *o.JobRequest) <-chan *o.TaskResponse {
-	complete  := make(chan *o.TaskResponse, 1)
-	go doExecution(job, complete)
+func ExecuteTask(task *TaskRequest) <-chan *TaskResponse {
+	complete  := make(chan *TaskResponse, 1)
+	go doExecution(task, complete)
 
 	return complete
 }
@@ -49,32 +49,32 @@ func peSetEnv(env []string, key string, value string) []string {
 	return env
 }
 
-func doExecution(job *o.JobRequest, completionChannel chan<- *o.TaskResponse) {
+func doExecution(task *TaskRequest, completionChannel chan<- *TaskResponse) {
 	// we must notify the parent when we exit.
-	defer func(c chan<- *o.TaskResponse, job *o.JobRequest) { c <- job.MyResponse }(completionChannel,job)
+	defer func(c chan<- *TaskResponse, task *TaskRequest) { c <- task.MyResponse }(completionChannel,task)
 
 	// first of all, verify that the score exists at all.
-	score, exists := Scores[job.Score]
+	score, exists := Scores[task.Score]
 	if !exists {
-		o.Warn("Job %d: Request for unknown score \"%s\"", job.Id, job.Score)
-		job.MyResponse.State = o.RESP_FAILED_UNKNOWN_SCORE
+		o.Warn("job%d: Request for unknown score \"%s\"", task.Id, task.Score)
+		task.MyResponse.State = RESP_FAILED_UNKNOWN_SCORE
 		return
 	}
-	si := NewScoreInterface(job)
+	si := NewScoreInterface(task)
 	if si == nil {
-		o.Warn("Job %d: Couldn't initialise Score Interface", job.Id)
-		job.MyResponse.State = o.RESP_FAILED_HOST_ERROR
+		o.Warn("job%d: Couldn't initialise Score Interface", task.Id)
+		task.MyResponse.State = RESP_FAILED_HOST_ERROR
 		return
 	}
 	if !si.Prepare() {
-		o.Warn("Job %d: Couldn't Prepare Score Interface", job.Id)
-		job.MyResponse.State = o.RESP_FAILED_HOST_ERROR
+		o.Warn("job%d: Couldn't Prepare Score Interface", task.Id)
+		task.MyResponse.State = RESP_FAILED_HOST_ERROR
 		return
 	}
 	defer si.Cleanup()
 
 	eenv := si.SetupProcess()
-	job.MyResponse.State = o.RESP_RUNNING
+	task.MyResponse.State = RESP_RUNNING
 
 	procenv := new(os.ProcAttr)
 	// Build the default environment.
@@ -82,8 +82,8 @@ func doExecution(job *o.JobRequest, completionChannel chan<- *o.TaskResponse) {
 	procenv.Env = peSetEnv(procenv.Env, "IFS", " \t\n")
 	pwd, err := os.Getwd()
 	if err != nil {
-		job.MyResponse.State = o.RESP_FAILED_HOST_ERROR
-		o.Warn("Job %d: Couldn't resolve PWD: %s", job.Id, err)
+		task.MyResponse.State = RESP_FAILED_HOST_ERROR
+		o.Warn("job%d: Couldn't resolve PWD: %s", task.Id, err)
 		return
 	}
 	procenv.Env = peSetEnv(procenv.Env, "PWD", pwd)
@@ -121,18 +121,18 @@ func doExecution(job *o.JobRequest, completionChannel chan<- *o.TaskResponse) {
 	var args []string = nil
 	args = append(args, eenv.Arguments...)
 
-	o.Info("Job %d: Executing %s", job.Id, score.Executable)
-	go batchLogger(job.Id, lr)
+	o.Info("job%d: Executing %s", task.Id, score.Executable)
+	go batchLogger(task.Id, lr)
 	proc, err := os.StartProcess(score.Executable, args, procenv)
 	if err != nil {
-		o.Warn("Job %d: Failed to start processs", job.Id)
-		job.MyResponse.State = o.RESP_FAILED_HOST_ERROR
+		o.Warn("job%d: Failed to start processs", task.Id)
+		task.MyResponse.State = RESP_FAILED_HOST_ERROR
 		return
 	}
 	wm, err := proc.Wait(0)
 	if err != nil {
-		o.Warn("Job %d: Error waiting for process", job.Id)
-		job.MyResponse.State = o.RESP_FAILED_UNKNOWN
+		o.Warn("job%d: Error waiting for process", task.Id)
+		task.MyResponse.State = RESP_FAILED_UNKNOWN
 		// Worse of all, we don't even know if we succeeded.
 		return
 	}
@@ -141,17 +141,17 @@ func doExecution(job *o.JobRequest, completionChannel chan<- *o.TaskResponse) {
 		return
 	}
 	if wm.WaitStatus.Signaled() {
-		o.Warn("Job %d: Process got signalled :(", job.Id)
-		job.MyResponse.State = o.RESP_FAILED_UNKNOWN
+		o.Warn("job%d: Process got signalled", task.Id)
+		task.MyResponse.State = RESP_FAILED_UNKNOWN
 		return
 	}
 	if wm.WaitStatus.Exited() {
 		if 0 == wm.WaitStatus.ExitStatus() {
-			o.Warn("Job %d: Process exited OK", job.Id)
-			job.MyResponse.State = o.RESP_FINISHED
+			o.Warn("job%d: Process exited OK", task.Id)
+			task.MyResponse.State = RESP_FINISHED
 		} else {
-			o.Warn("Job %d: Process exited with failure :(", job.Id)
-			job.MyResponse.State = o.RESP_FAILED
+			o.Warn("job%d: Process exited with failure", task.Id)
+			task.MyResponse.State = RESP_FAILED
 		}
 		return
 	}
