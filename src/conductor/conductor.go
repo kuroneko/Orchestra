@@ -26,7 +26,9 @@ func main() {
 	// Start the client registry - configuration parsing will block indefinately
 	// if the registry listener isn't working
 	StartRegistry()
-	// do an initial configuration load
+
+	// do an initial configuration load - must happen before
+	// MakeSpoolDir and InitDispatch()
 	ConfigLoad()
 
 	// Build the Spool Tree if necessary

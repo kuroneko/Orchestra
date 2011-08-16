@@ -48,12 +48,14 @@ func loadLastId() {
 			o.Fail("Found checkpoint file, but couldn't open it: %s", err)
 		}
 		fh,err := os.Open(savePath())
-		pe, ok = err.(*os.PathError)	
-		if !ok || pe.Error == os.ENOENT {
-			lastId = 0;
-			return;
+		if err != nil {
+			pe, ok = err.(*os.PathError)
+			if !ok || pe.Error == os.ENOENT {
+				lastId = 0;
+				return;
+			}
+			o.MightFail(err, "Couldn't open last_id file")
 		}
-		o.MightFail(err, "Couldn't open last_id file")
 		defer fh.Close()
 		cbio := bufio.NewReader(fh)
 		l, err := cbio.ReadString('\n')
