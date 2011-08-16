@@ -72,6 +72,12 @@ clientlibs/ -- Sample client libraries for communicating with the
 New In This Release
 ===================
 
+v0.3.0:
+ * Separation of some of the more esoteric shared code from the common
+   library
+ * Queue Persistence and result persistence
+ * Result expiry
+
 v0.2.0:
  * First public release.
 

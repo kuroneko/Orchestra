@@ -10,10 +10,8 @@ import (
 type TaskRequest struct {
 	Id		uint64				`json:"id"`
 	Score		string				`json:"score"`
-	State		TaskState			`json:"state"`		
 	Params		map[string]string		`json:"params"`
 	MyResponse	*TaskResponse			`json:"response"`
-	RetryTime	int64				`json:"retrytime"`
 }
 
 func NewTaskRequest() (req *TaskRequest) {

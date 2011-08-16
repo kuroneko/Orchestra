@@ -12,7 +12,6 @@ type TaskResponse struct {
 	Response	map[string]string		`json:"response"`
 	// player only fields
 	RetryTime	int64				`json:"retrytime"`
-
 }
 
 // Response related magic
