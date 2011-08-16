@@ -20,7 +20,9 @@ GOFILES=\
 	job_state.go\
 	resp_state.go\
 	task_state.go\
-	request.go\
+	job_request.go\
+	task_response.go\
+
 
 include $(GOROOT)/src/Make.cmd
 
