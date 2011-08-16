@@ -22,13 +22,11 @@ const (
 var lastId uint64 = 0
 
 func checkpointPath() string {
-	stateDir := strings.TrimSpace(GetStringOpt("conductor state path"))
-	return path.Join(stateDir, "last_id.checkpoint")
+	return path.Join(GetSpoolDirectory(), "last_id.checkpoint")
 }
 
 func savePath() string {
-	stateDir := strings.TrimSpace(GetStringOpt("conductor state path"))
-	return path.Join(stateDir, "last_id")
+	return path.Join(GetSpoolDirectory(), "last_id")
 }
 
 func loadLastId() {
