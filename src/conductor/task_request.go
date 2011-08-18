@@ -14,6 +14,13 @@ type TaskRequest struct {
 	RetryTime	int64				`json:"retrytime"`
 }
 
+func NewTaskRequest() (tr *TaskRequest) {
+	tr = new(TaskRequest)
+	tr.State = TASK_QUEUED
+
+	return tr
+}
+
 func (task *TaskRequest) Encode() (ptr *o.ProtoTaskRequest) {
 	ptr = new(o.ProtoTaskRequest)
 	ptr.Jobname = &task.job.Score

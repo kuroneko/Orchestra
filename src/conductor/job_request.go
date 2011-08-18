@@ -8,6 +8,7 @@ import (
 	"json"
 	"path"
 	"os"
+	"io"
 	o "orchestra"
 )
 
@@ -20,13 +21,22 @@ type JobRequest struct {
 	Params		map[string]string		`json:"params"`
 	Tasks		[]*TaskRequest			`json:"tasks"`
 	// These are private - you need to use the registry to access these
-	results		map[string]*TaskResponse	`json:"results"`
+	Results		map[string]*TaskResponse	`json:"results"`
 }
 
 func NewJobRequest() (req *JobRequest) {
 	req = new(JobRequest)
-	req.results = make(map[string]*TaskResponse)
+	req.Results = make(map[string]*TaskResponse)
 	return req
+}
+
+func JobRequestFromReader(src io.Reader) (req *JobRequest, err os.Error) {
+	req = NewJobRequest()
+	jdec := json.NewDecoder(src)
+
+	err = jdec.Decode(req)
+
+	return req, err
 }
 
 func (req *JobRequest) normalise() {
@@ -54,8 +64,7 @@ func (req *JobRequest) MakeTasks() (tasks []*TaskRequest) {
 	tasks = make([]*TaskRequest, numtasks)
 	
 	for c := 0; c < numtasks; c++ {
-		t := new(TaskRequest)
-		t.State = TASK_QUEUED
+		t := NewTaskRequest()
 		t.job = req
 		if (req.Scope == SCOPE_ALLOF) {
 			t.Player = req.Players[c]
@@ -79,24 +88,23 @@ func (req *JobRequest) FilenameForSpool() string {
 	return path.Join(GetSpoolDirectory(), "finished", FilenameForJobId(req.Id))
 }
 
-
-func doSerialisation(fh *os.File, buf []byte) {
+// dump the bytestream in buf into the serialisation file for req.
+func (req *JobRequest) doSerialisation(buf []byte) {
+	// first up, clean up old state.
+	UnlinkNodesForJobId(req.Id)
+	outpath := req.FilenameForSpool()
+	fh, err := os.OpenFile(outpath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+	if err != nil {
+		o.Warn("Could not create persistence file %s: %s", outpath, err)
+		return
+	}
 	defer fh.Close()
 	fh.Write(buf)
 }
 
 func (req *JobRequest) UpdateJobInformation()  {
-	// first up, clean up old state.
-	UnlinkNodesForJobId(req.Id)
-	
-	outpath := req.FilenameForSpool()
-	
-	fh, err := os.OpenFile(outpath, os.O_WRONLY|os.O_CREATE|os.O_EXCL,  0600)
-	if err != nil {
-		o.Warn("Could not create persistence file %s: %s", outpath, err)
-		return
-	}
 	buf, err := json.MarshalIndent(req, "", "  ")
 	o.MightFail(err, "Failed to marshal job %d", req.Id)
-	go doSerialisation(fh, buf)
+	//FIXME: should try to do this out of the registry's thread.
+	req.doSerialisation(buf)
 }

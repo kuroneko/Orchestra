@@ -73,8 +73,10 @@ New In This Release
 ===================
 
 v0.3.0:
+ * BUGFIX: Fixed conductor ignoring the last_id checkpoint file after
+     clean shutdowns.
  * Separation of some of the more esoteric shared code from the common
-   library
+     library
  * Queue Persistence and result persistence
  * Result expiry
 

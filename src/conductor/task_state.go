@@ -59,3 +59,9 @@ func (ts TaskState) UnmarshalJSON(in []byte) (err os.Error) {
 	return nil
 }
 
+func (ts TaskState) Finished() bool {
+	if ts == TASK_FINISHED {
+		return true
+	}
+	return false
+}

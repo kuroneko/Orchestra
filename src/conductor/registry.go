@@ -27,6 +27,8 @@ const (
 	requestDisqualifyPlayer
 	requestReviewJobStatus
 
+	requestWriteJobUpdate
+
 	requestQueueSize		= 10
 )
 
@@ -154,14 +156,14 @@ func manageRegistry() {
 			job, exists := jobRegister[req.tresp.id]
 			resp.success = exists
 			if exists {
-				job.results[req.hostname] = req.tresp
+				job.Results[req.hostname] = req.tresp
 				// force a queue update.
 				job.UpdateJobInformation()
 			}
 		case requestGetJobResult:
 			job, exists := jobRegister[req.id]
 			if exists {
-				result, exists := job.results[req.hostname]
+				result, exists := job.Results[req.hostname]
 				resp.success = exists
 				if exists {
 					resp.tresp = result
@@ -173,9 +175,9 @@ func manageRegistry() {
 			job, exists := jobRegister[req.id]
 			resp.success = exists
 			if exists {
-				resp.names = make([]string, len(job.results))
+				resp.names = make([]string, len(job.Results))
 				idx := 0
-				for k, _ := range job.results {
+				for k, _ := range job.Results {
 					resp.names[idx] = k
 					idx++
 				}
@@ -205,6 +207,12 @@ func manageRegistry() {
 			if exists {
 				job.updateState()
 				// force a queue update.
+				job.UpdateJobInformation()
+			}
+		case requestWriteJobUpdate:
+			job, exists := jobRegister[req.id]
+			resp.success = exists
+			if exists {
 				job.UpdateJobInformation()
 			}
 		}
@@ -358,13 +366,20 @@ func JobReviewState(id uint64) bool {
 	return resp.success
 }
 
+func JobWriteUpdate(id uint64) {
+	rr := newRequest(false)
+	rr.operation = requestWriteJobUpdate
+	rr.id = id
+	chanRegistryRequest <- rr
+}
+
 // Ugh.
 func (job *JobRequest) updateState() {
 	switch job.Scope {
 	case SCOPE_ONEOF:
 		// look for a success (any success) in the responses
 		var success bool = false
-		for _, res := range job.results {
+		for _, res := range job.Results {
 			if res.State == RESP_FINISHED {
 				success = true
 				break
@@ -386,7 +401,7 @@ func (job *JobRequest) updateState() {
 		
 		for pidx := range job.Players {
 			p := job.Players[pidx]
-			resp, exists := job.results[p]
+			resp, exists := job.Results[p]
 			if exists {
 				if resp.DidFail() {
 					failed++
@@ -406,4 +421,3 @@ func (job *JobRequest) updateState() {
 		}
 	}
 }
-

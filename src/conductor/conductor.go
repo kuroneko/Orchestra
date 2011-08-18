@@ -34,9 +34,12 @@ func main() {
 	// Build the Spool Tree if necessary
 	MakeSpoolDir()
 
+	// Load any old state we had.
+	LoadState()
+	defer SaveState()
+
 	// start the master dispatch system
 	InitDispatch()
-	defer CleanDispatch()
 
 	// start the status listener
 	StartHTTP()

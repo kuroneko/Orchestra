@@ -20,6 +20,13 @@ const (
 	JOB_FAILED
 )
 
+func (js JobState) Finished() bool {
+	if js == JOB_PENDING {
+		return false
+	}
+	return true
+}
+
 func (js JobState) String() (strout string) {
 	switch js {
 	case JOB_PENDING:
