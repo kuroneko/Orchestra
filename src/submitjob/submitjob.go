@@ -14,16 +14,16 @@ import (
 )
 
 type JobRequest struct {
-	Op	string
-	Score	string
-	Players	[]string
-	Scope	string
-	Params	map[string]string
+	Op	string		`json:"op"`
+	Score	string		`json:"score"`
+	Players	[]string	`json:"players"`
+	Scope	string		`json:"scope"`
+	Params	map[string]string	`json:"params"`
 }
 
 var (
 	AllOf	     = flag.Bool("all-of", false, "Send request to all named players")
-	AudienceSock = flag.String("audience-sock", "/var/run/conductor.sock", "Path for the audience submission socket")
+	AudienceSock = flag.String("audience-sock", "/var/spool/orchestra/conductor.sock", "Path for the audience submission socket")
 )
 
 func NewJobRequest() (jr *JobRequest) {

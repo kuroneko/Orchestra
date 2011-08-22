@@ -14,12 +14,12 @@ QUEUE JOB:
 
 Request:
 - dict:
-  - 'Op': 'queue'
-  - 'Score':  Score Name
-  - 'Players':  Array
+  - 'op': 'queue'
+  - 'score':  Score Name
+  - 'players':  Array
     - playername
-  - 'Scope': either 'all' or 'one'
-  - 'Params': dict
+  - 'scope': either 'all' or 'one'
+  - 'params': dict
     - k/v's passed through to job.
 
 Response:
@@ -29,19 +29,19 @@ Response:
 GET STATUS:
 Request:
 - dict:
-  - 'Op': 'status'
-  - 'Id': jobid
+  - 'op': 'status'
+  - 'id': jobid
 
 Response:
 - array:
 [error, dict]
 
 dict is:
-- 'Status': aggregated result "OK/Failure"
-- 'Players': dict - individual results
+- 'status': aggregated result "OK/Failure"
+- 'players': dict - individual results
   - hostname: dict
-    - 'Status': individual OK/Failure
-    - 'Response': dict
+    - 'status': individual OK/Failure
+    - 'response': dict
 
 error is 'OK' if successful.  jobid is the JobID if sucessful.
 

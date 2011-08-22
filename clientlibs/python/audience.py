@@ -3,24 +3,24 @@
 import socket
 import json
 
-DEFAULT_SOCKET_PATH="/var/run/conductor.sock"
+DEFAULT_SOCKET_PATH="/var/spool/orchestra/conductor.sock"
 
 class ServerError(Exception):
     pass
 
 def submit_job(score, scope, target, args=None, sockname=DEFAULT_SOCKET_PATH):
     reqObj = {
-        'Op': 'queue',
-        'Score': score,
-        'Scope': scope,
-        'Players': None,
-        'Params': {}
+        'op': 'queue',
+        'score': score,
+        'scope': scope,
+        'players': None,
+        'params': {}
     }
 
-    reqObj['Players'] = list(target)
+    reqObj['players'] = list(target)
 
     if args is not None:
-        reqObj['Params'] = args
+        reqObj['params'] = args
 
     sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     sock.connect(sockname)
@@ -39,8 +39,8 @@ def submit_job(score, scope, target, args=None, sockname=DEFAULT_SOCKET_PATH):
 
 def get_status(jobid, sockname=DEFAULT_SOCKET_PATH):
     reqObj = {
-        'Op': 'status',
-        'Id': jobid
+        'op': 'status',
+        'id': jobid
     }
     sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     sock.connect(sockname)

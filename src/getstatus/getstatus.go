@@ -15,22 +15,22 @@ import (
 )
 
 type StatusRequest struct {
-	Op	string
-	Id	uint64
+	Op	string	`json:"op"`
+	Id	uint64	`json:"id"`
 }
 
 type PlayerStatus struct {
-	Status		*string
-	Response	map[string]*string
+	Status		*string		`json:"status"`
+	Response	map[string]*string	`json:"response"`
 }
 
 type StatusResponse struct {
-	Status		*string
-	Players		map[string]*PlayerStatus
+	Status		*string		`json:"status"`
+	Players		map[string]*PlayerStatus	`json:"players"`
 }
 
 var (
-	AudienceSock = flag.String("audience-sock", "/var/run/conductor.sock", "Path for the audience submission socket")
+	AudienceSock = flag.String("audience-sock", "/var/spool/orchestra/conductor.sock", "Path for the audience submission socket")
 )
 
 func NewStatusRequest() (sr *StatusRequest) {

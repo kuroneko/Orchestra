@@ -85,6 +85,9 @@ New In This Release
 v0.x.x:
  * BUGFIX: Fixed conductor ignoring the last_id checkpoint file after
      clean shutdowns.
+ * FEATUREFIX: Fix the exported fieldnames in the audience interface 
+     so they no longer contain capitals.  Refactor slightly to reuse
+     state types defined for persistence.
  * Separation of some of the more esoteric shared code from the common
      library
  * Conductor Queue Persistence.
