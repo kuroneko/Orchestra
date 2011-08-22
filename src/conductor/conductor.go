@@ -11,6 +11,7 @@ import (
 
 var (
 	ConfigFile = flag.String("config-file", "/etc/orchestra/conductor.conf", "File containing the conductor configuration")
+	DontVerifyPeer		= flag.Bool("dont-verify-peer", false, "Ignore TLS verification for the peer")
 	// this is used a lot for marshalling. I just can't stuff it
 	// anywhere else.
 	InvalidValueError = os.NewError("Invalid value")

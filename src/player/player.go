@@ -30,6 +30,7 @@ type NewConnectionInfo struct {
 
 var (
 	ConfigFile		= flag.String("config-file", "/etc/orchestra/player.conf", "Path to the configuration file")	
+	DontVerifyPeer		= flag.Bool("dont-verify-peer", false, "Ignore TLS verification for the peer")
 	CertPair tls.Certificate
 	CACertPool *x509.CertPool
 	LocalHostname string	= ""
@@ -209,7 +210,7 @@ func connectMe(initialDelay int64) {
 		raddr := fmt.Sprintf("%s:%d", masterHostname, 2258)
 		o.Info("Connecting to %s", raddr)
 		conn, err := tls.Dial("tcp", raddr, tconf)		
-		if err == nil {
+		if err == nil && !*DontVerifyPeer {
 			conn.Handshake()
 			err = conn.VerifyHostname(masterHostname)
 		}

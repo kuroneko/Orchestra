@@ -143,7 +143,7 @@ func handleIdentify(client *ClientInfo, message interface{}) {
 
 	/* if we're TLS, verify the client's certificate given the name it used */
 	tlsc, ok := client.connection.(*tls.Conn)
-	if ok {
+	if ok && !*DontVerifyPeer {
 		intermediates := x509.NewCertPool()
 
 		o.Debug("Connection is TLS.")
