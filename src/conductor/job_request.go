@@ -35,6 +35,11 @@ func JobRequestFromReader(src io.Reader) (req *JobRequest, err os.Error) {
 	jdec := json.NewDecoder(src)
 
 	err = jdec.Decode(req)
+	if err == nil {
+		if req.Results == nil {
+			req.Results = make(map[string]*TaskResponse)
+		}
+	}
 
 	return req, err
 }

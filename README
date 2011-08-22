@@ -51,7 +51,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 Building
 ========
 
-Install the Go Release 59 compiler.
+Install the Go Release 59 compiler.  Prior to compilation, apply the
+patches in go-patches/ in order to fix a few package bugs.
 
 From the top level directory, run make.  It will use goinstall to
 build the binaries in bin/
@@ -69,16 +70,25 @@ samples/ -- Sample configuration files.
 clientlibs/ -- Sample client libraries for communicating with the
 	       Conductor as the Audience.
 
+go-patches/ -- Patches against the Release version of Go to fix
+	       critical bugs or missing features encountered when
+	       implementing Orchestra
+
+Patches Included
+================
+
+ * json-unmarshal-immediate.diff : Fix for Go Bug #2170
+
 New In This Release
 ===================
 
-v0.3.0:
+v0.x.x:
  * BUGFIX: Fixed conductor ignoring the last_id checkpoint file after
      clean shutdowns.
  * Separation of some of the more esoteric shared code from the common
      library
- * Queue Persistence and result persistence
- * Result expiry
+ * Conductor Queue Persistence.
+ * Patches against the Go standard packages. :(
 
 v0.2.0:
  * First public release.

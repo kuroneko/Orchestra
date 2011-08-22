@@ -223,8 +223,11 @@ func handleResult(client *ClientInfo, message interface{}){
 			// pending list so we stop bugging the client for it.
 			task, exists := client.pendingTasks[r.id]
 			if exists {
+				o.Debug("Storing results for Job %d", r.id)
 				// store the result.
-				JobAddResult(client.Player, r)
+				if !JobAddResult(client.Player, r) {
+					o.Assert("Couldn't add result for pending task")
+				}
 
 				// next, work out if the job is a retryable failure or not
 				var didretry bool = false

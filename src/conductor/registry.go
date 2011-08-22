@@ -375,11 +375,19 @@ func JobWriteUpdate(id uint64) {
 
 // Ugh.
 func (job *JobRequest) updateState() {
+	if job.Results == nil {
+		o.Assert("job.Results nil for jobid %d", job.Id)
+		return
+	}
 	switch job.Scope {
 	case SCOPE_ONEOF:
 		// look for a success (any success) in the responses
 		var success bool = false
-		for _, res := range job.Results {
+		for host, res := range job.Results {
+			if res == nil {
+				o.Debug("nil result for %s?", host)
+				continue
+			}
 			if res.State == RESP_FINISHED {
 				success = true
 				break

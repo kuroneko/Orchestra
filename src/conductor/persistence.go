@@ -208,6 +208,7 @@ func loadSpoolFiles(dirname string, depth int) {
 				defer fh.Close()
 				jr, err := JobRequestFromReader(fh)
 				if err != nil || jr.Id != id {
+					o.Warn("Couldn't parse?! %s", err)
 					shuffleToCorrupted(abspath, "Parse Failure")
 					continue
 				}
@@ -229,9 +230,10 @@ func RestoreJobState(job *JobRequest) bool {
 		if HostAuthorised(p) {
 			playersout = append(playersout, p)
 			// fix the result too.
-			resultsout[p] = job.Results[p]
-			if (resultsout[p] != nil) {
-				resultsout[p].id = job.Id
+			resout, exists := job.Results[p]
+			if exists && resout != nil {
+				resout.id = job.Id
+				resultsout[p] = resout
 			}
 			// remove it so we can sweep it in pass2 for
 			// results from old hosts that matter.
