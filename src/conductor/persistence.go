@@ -303,18 +303,13 @@ func RestoreJobState(job *JobRequest) bool {
 	return true
 }
 
-
-// Seed registry from the active spool.
-func seedRegistry() {
+func LoadState() {
+	loadLastId()
 	dirname := path.Join(spoolDirectory, "active")
 	loadSpoolFiles(dirname, bucketDepth)
 }
 
-func LoadState() {
-	loadLastId()
-	seedRegistry()
-}
-
 func SaveState() {
+	JobWriteAll()
 	saveLastId()
 }

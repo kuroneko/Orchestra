@@ -28,6 +28,7 @@ const (
 	requestReviewJobStatus
 
 	requestWriteJobUpdate
+	requestWriteJobAll
 
 	requestQueueSize		= 10
 )
@@ -215,6 +216,11 @@ func manageRegistry() {
 			if exists {
 				job.UpdateJobInformation()
 			}
+		case requestWriteJobAll:
+			for _, job := range jobRegister {
+				job.UpdateJobInformation()
+			}
+			resp.success = true
 		}
 		if req.responseChannel != nil {
 			req.responseChannel <- resp
@@ -371,6 +377,16 @@ func JobWriteUpdate(id uint64) {
 	rr.operation = requestWriteJobUpdate
 	rr.id = id
 	chanRegistryRequest <- rr
+}
+
+func JobWriteAll() bool {
+	rr := newRequest(true)
+	rr.operation = requestWriteJobAll
+
+	chanRegistryRequest <- rr
+	resp := <-rr.responseChannel
+
+	return resp.success
 }
 
 // Ugh.
