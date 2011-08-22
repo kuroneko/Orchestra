@@ -1,0 +1,33 @@
+diff -r bacb4ed5791c src/pkg/json/decode.go
+--- a/src/pkg/json/decode.go	Thu Aug 04 16:38:18 2011 +1000
++++ b/src/pkg/json/decode.go	Mon Aug 22 12:44:02 2011 +1000
+@@ -549,16 +549,25 @@
+ 	item := d.data[start:d.off]
+ 
+ 	// Check for unmarshaler.
+-	wantptr := item[0] == 'n' // null
+-	unmarshaler, pv := d.indirect(v, wantptr)
+-	if unmarshaler != nil {
++	unmarshaler, ok := v.Interface().(Unmarshaler)
++	if ok {
+ 		err := unmarshaler.UnmarshalJSON(item)
+ 		if err != nil {
+ 			d.error(err)
+ 		}
+ 		return
++	} else {
++		wantptr := item[0] == 'n' // null
++		unmarshaler, pv := d.indirect(v, wantptr)
++		if unmarshaler != nil {
++			err := unmarshaler.UnmarshalJSON(item)
++			if err != nil {
++				d.error(err)
++			}
++			return
++		}
++		v = pv
+ 	}
+-	v = pv
+ 
+ 	switch c := item[0]; c {
+ 	case 'n': // null
