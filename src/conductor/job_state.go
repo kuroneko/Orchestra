@@ -10,8 +10,9 @@ import (
 type JobState int
 
 const (
+	JOB_STATE_INVALID	= JobState(iota)
 	// Job is pending resolution
-	JOB_PENDING		= JobState(iota)
+	JOB_PENDING
 	// Job has completed and has no failures.
 	JOB_SUCCESSFUL
 	// Job has completed and has mixed results.
@@ -52,7 +53,7 @@ func (js JobState) MarshalJSON() (out []byte, err os.Error) {
 	return nil, InvalidValueError
 }
 
-func (js JobState) UnmarshalJSON(in []byte) (err os.Error) {
+func (js *JobState) UnmarshalJSON(in []byte) (err os.Error) {
 	var statestr string
 	err = json.Unmarshal(in, &statestr)
 	if err != nil {
@@ -60,13 +61,13 @@ func (js JobState) UnmarshalJSON(in []byte) (err os.Error) {
 	}
 	switch statestr {
 	case "PENDING":
-		js = JOB_PENDING
+		*js = JOB_PENDING
 	case "OK":
-		js = JOB_SUCCESSFUL
+		*js = JOB_SUCCESSFUL
 	case "FAIL":
-		js = JOB_FAILED
+		*js = JOB_FAILED
 	case "PARTIAL_FAIL":
-		js = JOB_FAILED_PARTIAL
+		*js = JOB_FAILED_PARTIAL
 	default:
 		return InvalidValueError
 	}

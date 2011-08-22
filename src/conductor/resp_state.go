@@ -11,7 +11,8 @@ type ResponseState int
 
 const (
 	// Response states
-	RESP_PENDING			= ResponseState(iota)	// internal state, not wire.
+	RESP_INVALID			= ResponseState(iota)
+	RESP_PENDING			// internal state, not wire.
 	RESP_RUNNING
 	RESP_FINISHED
 	RESP_FAILED
@@ -46,7 +47,7 @@ func (rs ResponseState) MarshalJSON() (out []byte, err os.Error) {
 	return nil, InvalidValueError
 }
 
-func (rs ResponseState) UnmarshalJSON(in []byte) (err os.Error) {
+func (rs *ResponseState) UnmarshalJSON(in []byte) (err os.Error) {
 	var statestr string
 	err = json.Unmarshal(in, &statestr)
 	if err != nil {
@@ -54,17 +55,17 @@ func (rs ResponseState) UnmarshalJSON(in []byte) (err os.Error) {
 	}
 	switch statestr {
 	case "PENDING":
-		rs = RESP_PENDING
+		*rs = RESP_PENDING
 	case "OK":
-		rs = RESP_FINISHED
+		*rs = RESP_FINISHED
 	case "FAIL":
-		rs = RESP_FAILED
+		*rs = RESP_FAILED
 	case "UNK_SCORE":
-		rs = RESP_FAILED_UNKNOWN_SCORE
+		*rs = RESP_FAILED_UNKNOWN_SCORE
 	case "HOST_ERROR":
-		rs = RESP_FAILED_HOST_ERROR
+		*rs = RESP_FAILED_HOST_ERROR
 	case "UNKNOWN_FAILURE":
-		rs = RESP_FAILED_UNKNOWN
+		*rs = RESP_FAILED_UNKNOWN
 	default:
 		return InvalidValueError
 	}

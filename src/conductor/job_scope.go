@@ -8,7 +8,8 @@ import (
 )
 
 const (
-	SCOPE_ONEOF		= JobScope(iota)
+	SCOPE_INVALID		= JobScope(iota)
+	SCOPE_ONEOF
 	SCOPE_ALLOF
 )
 
@@ -34,7 +35,7 @@ func (js JobScope) MarshalJSON() (out []byte, err os.Error) {
 	return nil, InvalidValueError
 }
 
-func (js JobScope) UnmarshalJSON(in []byte) (err os.Error) {
+func (js *JobScope) UnmarshalJSON(in []byte) (err os.Error) {
 	var scopestr string
 	err = json.Unmarshal(in, &scopestr)
 	if err != nil {
@@ -42,9 +43,9 @@ func (js JobScope) UnmarshalJSON(in []byte) (err os.Error) {
 	}
 	switch scopestr {
 	case "one":
-		js = SCOPE_ONEOF
+		*js = SCOPE_ONEOF
 	case "all":
-		js = SCOPE_ALLOF
+		*js = SCOPE_ALLOF
 	default:
 		return InvalidValueError
 	}

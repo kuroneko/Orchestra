@@ -10,8 +10,9 @@ import (
 type TaskState int
 
 const (
+	TASK_INVALID		= TaskState(iota)
 	// Task is fresh and has never been sent to the client.  It can be rescheduled still.
-	TASK_QUEUED		= TaskState(iota)
+	TASK_QUEUED
 	// Task has been transmitted at least once
 	TASK_PENDINGRESULT
 	// Task has finished and we have received a result.
@@ -40,7 +41,7 @@ func (ts TaskState) MarshalJSON() (out []byte, err os.Error) {
 	return nil, InvalidValueError
 }
 
-func (ts TaskState) UnmarshalJSON(in []byte) (err os.Error) {
+func (ts *TaskState) UnmarshalJSON(in []byte) (err os.Error) {
 	var statestr string
 	err = json.Unmarshal(in, &statestr)
 	if err != nil {
@@ -48,11 +49,11 @@ func (ts TaskState) UnmarshalJSON(in []byte) (err os.Error) {
 	}
 	switch statestr {
 	case "QUEUED":
-		ts = TASK_QUEUED
+		*ts = TASK_QUEUED
 	case "PENDING":
-		ts = TASK_PENDINGRESULT
+		*ts = TASK_PENDINGRESULT
 	case "FINISHED":
-		ts = TASK_FINISHED
+		*ts = TASK_FINISHED
 	default:
 		return InvalidValueError
 	}
