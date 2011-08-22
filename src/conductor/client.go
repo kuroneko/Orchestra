@@ -89,6 +89,8 @@ func (client *ClientInfo) GotTask(task *TaskRequest) {
 		task.State = TASK_PENDINGRESULT
 		client.pendingTasks[task.job.Id] = task
 		client.SendTask(task)
+		// request a update to the spool so the PENDING flag is stored.
+		JobWriteUpdate(task.job.Id)
 	case TASK_FINISHED:
 		/* discard.  We don't care about tasks that are done. */		
 	}
