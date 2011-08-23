@@ -10,6 +10,7 @@ package main
 import (
 	o "orchestra"
 	"sort"
+	"time"
 )
 
 // Request Types
@@ -31,6 +32,8 @@ const (
 	requestWriteJobAll
 
 	requestQueueSize		= 10
+
+	jobLingerTime			= int64(600e9)
 )
 
 type registryRequest struct {
@@ -55,6 +58,8 @@ var (
 	chanRegistryRequest	= make(chan *registryRequest, requestQueueSize)
  	clientList 		= make(map[string]*ClientInfo)
 	jobRegister 		= make(map[uint64]*JobRequest)
+	expiryChan		<-chan int64
+	expiryJobid 		uint64
 )
 
 func regInternalAdd(hostname string) {
@@ -71,159 +76,53 @@ func regInternalDel(hostname string) {
 	clientList[hostname] = nil, false
 }
 
+func regInternalExpireJob(jobid uint64) {
+	job, exists := jobRegister[jobid]
+	if exists {
+		if job.State.Finished() {
+			jobRegister[jobid] = nil, false
+		} else {
+			o.Assert("Tried to expire incomplete job.")
+		}
+	}
+}
+
+
+var registryHandlers = map[int] func(*registryRequest, *registryResponse) {
+requestAddClient:	regintAddClient,
+requestGetClient:	regintGetClient,
+requestDeleteClient:	regintDeleteClient,
+requestSyncClients:	regintSyncClients,
+requestAddJob:		regintAddJob,
+requestGetJob:		regintGetJob,
+requestAddJobResult:	regintAddJobResult,
+requestGetJobResult:	regintGetJobResult,
+requestGetJobResultNames:	regintGetJobResultNames,
+requestDisqualifyPlayer:	regintDisqualifyPlayer,
+requestReviewJobStatus:	regintReviewJobStatus,
+requestWriteJobUpdate:	regintWriteJobUpdate,
+requestWriteJobAll:	regintWriteJobAll,
+}
+
 func manageRegistry() {
 	for {
-		req := <-chanRegistryRequest
-		resp := new(registryResponse)
-		/* by default, we failed. */
-		resp.success = false
-		switch (req.operation) {
-		case requestAddClient:
-			_, exists := clientList[req.hostname]
+		select {
+		case req := <-chanRegistryRequest:
+			resp := new(registryResponse)
+			// by default, we failed.
+			resp.success = false
+			// find the operation
+			handler, exists := registryHandlers[req.operation]
 			if exists {
-				resp.success = false
-			} else {
-				regInternalAdd(req.hostname)
-				resp.success = true
+				handler(req, resp)
 			}
-		case requestGetClient:
-			clinfo, exists := clientList[req.hostname]
-			if exists {
-				resp.success = true
-				resp.info = clinfo
-			} else {
-				resp.success = false
+			if req.responseChannel != nil {
+				req.responseChannel <- resp
 			}
-		case requestDeleteClient:
-			_, exists := clientList[req.hostname]
-			if exists {
-				resp.success = true
-				regInternalDel(req.hostname)
-			} else {
-				resp.success = false
-			}
-		case requestSyncClients:
-			/* we need to make sure the registered clients matches
-			 * the hostlist we're given.
-			 *
-			 * First, we transform the array into a map
-			 */
-			newhosts := make(map[string]bool)
-			for k,_ := range req.hostlist {
-				newhosts[req.hostlist[k]] = true
-			}
-			/* now, scan the current list, checking to see if
-			 * they exist.  Remove them from the newhosts map
-			 * if they do exist. 
-			 */
-			for k,_ := range clientList {
-				_, exists := newhosts[k]
-				if exists {
-					/* remove it from the newhosts map */
-					newhosts[k] = false, false
-				} else {
-					regInternalDel(k)
-				}
-			}
-			/* now that we're finished, we should only have
-			 * new clients in the newhosts list left. 
-			 */
-			for k,_ := range newhosts {
-				regInternalAdd(k)
-			}
-			/* and we're done. */
-		case requestAddJob:
-			if nil != req.job {
-				// ensure that the players are sorted!
-				sort.Strings(req.job.Players)
-				// update the state
-				req.job.updateState()
-				// and register the job
-				jobRegister[req.job.Id] = req.job
-				// force a queue update.
-				req.job.UpdateJobInformation()
-				resp.success = true
-			} else {
-				resp.success = false
-			}
-		case requestGetJob:
-			job, exists := jobRegister[req.id]
-			resp.success = exists
-			if exists {
-				resp.jobs = make([]*JobRequest, 1)
-				resp.jobs[0] = job
-			}
-		case requestAddJobResult:
-			job, exists := jobRegister[req.tresp.id]
-			resp.success = exists
-			if exists {
-				job.Results[req.hostname] = req.tresp
-				// force a queue update.
-				job.UpdateJobInformation()
-			}
-		case requestGetJobResult:
-			job, exists := jobRegister[req.id]
-			if exists {
-				result, exists := job.Results[req.hostname]
-				resp.success = exists
-				if exists {
-					resp.tresp = result
-				}
-			} else {
-				resp.success = false
-			}
-		case requestGetJobResultNames:
-			job, exists := jobRegister[req.id]
-			resp.success = exists
-			if exists {
-				resp.names = make([]string, len(job.Results))
-				idx := 0
-				for k, _ := range job.Results {
-					resp.names[idx] = k
-					idx++
-				}
-			}
-		case requestDisqualifyPlayer:
-			job, exists := jobRegister[req.id]
-			if exists {
-				idx := sort.Search(len(job.Players), func(idx int) bool { return job.Players[idx] >= req.hostname })
-				if (job.Players[idx] == req.hostname) {
-					resp.success = true
-					newplayers := make([]string, len(job.Players)-1)
-					copy(newplayers[0:idx], job.Players[0:idx])
-					copy(newplayers[idx:len(job.Players)-1], job.Players[idx+1:len(job.Players)])
-					job.Players = newplayers
-					job.updateState()
-					// force a queue update.
-					job.UpdateJobInformation()
-				} else {
-					resp.success = false
-				}
-			} else {
-				resp.success = false
-			}
-		case requestReviewJobStatus:
-			job, exists := jobRegister[req.id]
-			resp.success = exists
-			if exists {
-				job.updateState()
-				// force a queue update.
-				job.UpdateJobInformation()
-			}
-		case requestWriteJobUpdate:
-			job, exists := jobRegister[req.id]
-			resp.success = exists
-			if exists {
-				job.UpdateJobInformation()
-			}
-		case requestWriteJobAll:
-			for _, job := range jobRegister {
-				job.UpdateJobInformation()
-			}
-			resp.success = true
-		}
-		if req.responseChannel != nil {
-			req.responseChannel <- resp
+		case <-expiryChan:
+			regInternalExpireJob(expiryJobid)
+			expiryChan = nil
+
 		}
 	}
 }
@@ -251,6 +150,16 @@ func ClientAdd(hostname string) (success bool) {
 	return resp.success
 }
 
+func regintAddClient(req *registryRequest, resp *registryResponse) {
+	_, exists := clientList[req.hostname]
+	if exists {
+		resp.success = false
+	} else {
+		regInternalAdd(req.hostname)
+		resp.success = true
+	}
+}
+
 func ClientDelete(hostname string) (success bool) {
 	r := newRequest(true)
 	r.operation = requestDeleteClient
@@ -259,6 +168,16 @@ func ClientDelete(hostname string) (success bool) {
 	resp := <- r.responseChannel
 	
 	return resp.success
+}
+
+func regintDeleteClient(req *registryRequest, resp *registryResponse) {
+	_, exists := clientList[req.hostname]
+	if exists {
+		resp.success = true
+		regInternalDel(req.hostname)
+	} else {
+		resp.success = false
+	}
 }
 
 func ClientGet(hostname string) (info *ClientInfo) {
@@ -273,6 +192,16 @@ func ClientGet(hostname string) (info *ClientInfo) {
 	return nil
 }
 
+func regintGetClient(req *registryRequest, resp *registryResponse) {
+	clinfo, exists := clientList[req.hostname]
+	if exists {
+		resp.success = true
+		resp.info = clinfo
+	} else {
+		resp.success = false
+	}
+}
+
 func ClientUpdateKnown(hostnames []string) {
 	/* this is an asynchronous, we feed it into the registry 
 	 * and it'll look after itself.
@@ -281,6 +210,34 @@ func ClientUpdateKnown(hostnames []string) {
 	r.operation = requestSyncClients
 	r.hostlist = hostnames
 	chanRegistryRequest <- r
+}
+
+func regintSyncClients(req *registryRequest, resp *registryResponse) {
+	// we need to make sure the registered clients matches the
+	// hostlist we're given.
+	//
+	// First, we transform the array into a map
+	newhosts := make(map[string]bool)
+	for k,_ := range req.hostlist {
+		newhosts[req.hostlist[k]] = true
+	}
+	// now, scan the current list, checking to see if they exist.
+	// Remove them from the newhosts map if they do exist.
+	for k,_ := range clientList {
+		_, exists := newhosts[k]
+		if exists {
+			// remove it from the newhosts map
+			newhosts[k] = false, false
+		} else {
+			regInternalDel(k)
+		}
+	}
+	// now that we're finished, we should only have new clients in
+	// the newhosts list left.
+	for k,_ := range newhosts {
+		regInternalAdd(k)
+	}
+	// and we're done.
 }
 
 // Add a Job to the registry.  Return true if successful, returns
@@ -294,6 +251,22 @@ func JobAdd(job *JobRequest) bool {
 	chanRegistryRequest <- rr
 	resp := <- rr.responseChannel 
 	return resp.success
+}
+
+func regintAddJob(req *registryRequest, resp *registryResponse) {
+	if nil != req.job {
+		// ensure that the players are sorted!
+		sort.Strings(req.job.Players)
+		// update the state
+		req.job.updateState()
+		// and register the job
+		jobRegister[req.job.Id] = req.job
+		// force a queue update.
+		req.job.UpdateJobInformation()
+		resp.success = true
+	} else {
+		resp.success = false
+	}
 }
 
 // Get a Job from the registry.  Returns the job if successful,
@@ -311,6 +284,15 @@ func JobGet(id uint64) *JobRequest {
 	return resp.jobs[0]
 }
 
+func regintGetJob(req *registryRequest, resp *registryResponse) {
+	job, exists := jobRegister[req.id]
+	resp.success = exists
+	if exists {
+		resp.jobs = make([]*JobRequest, 1)
+		resp.jobs[0] = job
+	}
+}
+
 // Attach a result to a Job in the Registry
 //
 // This exists in order to prevent nasty concurrency problems
@@ -326,6 +308,16 @@ func JobAddResult(playername string, task *TaskResponse) bool {
 	return resp.success
 }
 
+func regintAddJobResult(req *registryRequest, resp *registryResponse) {
+	job, exists := jobRegister[req.tresp.id]
+	resp.success = exists
+	if exists {
+		job.Results[req.hostname] = req.tresp
+		// force a queue update.
+		job.UpdateJobInformation()
+	}
+}
+
 // Get a result from the registry
 func JobGetResult(id uint64, playername string) (tresp *TaskResponse) {
 	rr := newRequest(true)
@@ -337,6 +329,19 @@ func JobGetResult(id uint64, playername string) (tresp *TaskResponse) {
 	return resp.tresp
 }
 
+func regintGetJobResult(req *registryRequest, resp *registryResponse) {
+	job, exists := jobRegister[req.id]
+	if exists {
+		result, exists := job.Results[req.hostname]
+		resp.success = exists
+		if exists {
+			resp.tresp = result
+		}
+	} else {
+		resp.success = false
+	}
+}
+
 // Get a list of names we have results for against a given job.
 func JobGetResultNames(id uint64) (names []string) {
 	rr := newRequest(true)
@@ -346,6 +351,19 @@ func JobGetResultNames(id uint64) (names []string) {
 	chanRegistryRequest <- rr
 	resp := <- rr.responseChannel 
 	return resp.names
+}
+
+func regintGetJobResultNames(req *registryRequest, resp *registryResponse) {
+	job, exists := jobRegister[req.id]
+	resp.success = exists
+	if exists {
+		resp.names = make([]string, len(job.Results))
+		idx := 0
+		for k, _ := range job.Results {
+			resp.names[idx] = k
+			idx++
+		}
+	}
 }
 
 //  Disqualify a player from servicing a job
@@ -361,6 +379,27 @@ func JobDisqualifyPlayer(id uint64, playername string) bool {
 	return resp.success
 }
 
+func regintDisqualifyPlayer(req *registryRequest, resp *registryResponse) {
+	job, exists := jobRegister[req.id]
+	if exists {
+		idx := sort.Search(len(job.Players), func(idx int) bool { return job.Players[idx] >= req.hostname })
+		if (job.Players[idx] == req.hostname) {
+			resp.success = true
+			newplayers := make([]string, len(job.Players)-1)
+			copy(newplayers[0:idx], job.Players[0:idx])
+			copy(newplayers[idx:len(job.Players)-1], job.Players[idx+1:len(job.Players)])
+			job.Players = newplayers
+			job.updateState()
+			// force a queue update.
+			job.UpdateJobInformation()
+		} else {
+			resp.success = false
+		}
+	} else {
+		resp.success = false
+	}
+}
+
 func JobReviewState(id uint64) bool {
 	rr := newRequest(true)
 	rr.operation = requestReviewJobStatus
@@ -372,11 +411,29 @@ func JobReviewState(id uint64) bool {
 	return resp.success
 }
 
+func regintReviewJobStatus(req *registryRequest, resp *registryResponse) {
+	job, exists := jobRegister[req.id]
+	resp.success = exists
+	if exists {
+		job.updateState()
+		// force a queue update.
+		job.UpdateJobInformation()
+	}
+}
+
 func JobWriteUpdate(id uint64) {
 	rr := newRequest(false)
 	rr.operation = requestWriteJobUpdate
 	rr.id = id
 	chanRegistryRequest <- rr
+}
+
+func regintWriteJobUpdate(req *registryRequest, resp *registryResponse) {
+	job, exists := jobRegister[req.id]
+	resp.success = exists
+	if exists {
+		job.UpdateJobInformation()
+	}
 }
 
 func JobWriteAll() bool {
@@ -389,12 +446,20 @@ func JobWriteAll() bool {
 	return resp.success
 }
 
+func regintWriteJobAll(req *registryRequest, resp *registryResponse) {
+	for _, job := range jobRegister {
+		job.UpdateJobInformation()
+	}
+	resp.success = true
+}
+
 // Ugh.
 func (job *JobRequest) updateState() {
 	if job.Results == nil {
 		o.Assert("job.Results nil for jobid %d", job.Id)
 		return
 	}
+	was_finished := job.State.Finished()
 	switch job.Scope {
 	case SCOPE_ONEOF:
 		// look for a success (any success) in the responses
@@ -443,5 +508,9 @@ func (job *JobRequest) updateState() {
 		} else {
 			job.State = JOB_FAILED_PARTIAL
 		}
+	}
+	if !was_finished && job.State.Finished() {
+		o.Debug("job%d: Finished - Setting Expiry Time")
+		job.expirytime = time.Nanoseconds() + jobLingerTime
 	}
 }

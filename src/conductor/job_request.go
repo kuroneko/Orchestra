@@ -20,8 +20,14 @@ type JobRequest struct {
 	State		JobState			`json:"state"`		
 	Params		map[string]string		`json:"params"`
 	Tasks		[]*TaskRequest			`json:"tasks"`
-	// These are private - you need to use the registry to access these
+	// you need to use the registry to access these - only public for
+	// marshalling use.
 	Results		map[string]*TaskResponse	`json:"results"`
+	// private:
+
+	// Timeout for autoexpiry.  Only valid if State if
+	// job.State.Finished() is true.
+	expirytime	int64
 }
 
 func NewJobRequest() (req *JobRequest) {
