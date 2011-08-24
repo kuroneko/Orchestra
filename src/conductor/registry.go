@@ -11,6 +11,7 @@ import (
 	o "orchestra"
 	"sort"
 	"time"
+	"container/list"
 )
 
 // Request Types
@@ -33,7 +34,7 @@ const (
 
 	requestQueueSize		= 10
 
-	jobLingerTime			= int64(600e9)
+	jobLingerTime			= int64(30e9)
 )
 
 type registryRequest struct {
@@ -60,7 +61,14 @@ var (
 	jobRegister 		= make(map[uint64]*JobRequest)
 	expiryChan		<-chan int64
 	expiryJobid 		uint64
+	expiryList		*list.List
+
+	expiryLoopFudge 	int64 = 10e6; /* 10 ms should be enough fudgefactor */
 )
+
+func init() {
+	expiryList = list.New()
+}
 
 func regInternalAdd(hostname string) {
 	o.Warn("Registry: New Host \"%s\"", hostname)
@@ -87,6 +95,38 @@ func regInternalExpireJob(jobid uint64) {
 	}
 }
 
+func regInternalFindNextExpiry() {
+	if expiryChan != nil {
+		o.Assert("Attempted to Find Next Expiry avenue with expiry timer active.")
+	}
+	// if there's nothing to expire, do nothing.
+	if expiryList.Len() == 0 {
+		return
+	}
+
+	for expiryChan == nil && expiryList.Len() > 0 {
+		jobif := expiryList.Remove(expiryList.Front())
+		req, ok := jobif.(*JobRequest)
+		if !ok {
+			o.Assert("item in expiryList not a *JobRequest")
+		}
+		if (time.Nanoseconds() + expiryLoopFudge) > req.expirytime {
+			regInternalExpireJob(req.Id)
+		} else {
+			expiryChan = time.After(req.expirytime - time.Nanoseconds())
+			expiryJobid = req.Id
+		}
+	}
+}
+
+func regInternalMarkJobForExpiry(job *JobRequest) {
+	job.expirytime = time.Nanoseconds() + jobLingerTime
+	expiryList.PushBack(job)
+	// if there is no job pending expiry, feed it into the delay loop
+	if expiryChan == nil {
+		regInternalFindNextExpiry()
+	}
+}
 
 var registryHandlers = map[int] func(*registryRequest, *registryResponse) {
 requestAddClient:	regintAddClient,
@@ -120,9 +160,10 @@ func manageRegistry() {
 				req.responseChannel <- resp
 			}
 		case <-expiryChan:
+			o.Debug("job%d: Expiring Job Record", expiryJobid)
 			regInternalExpireJob(expiryJobid)
 			expiryChan = nil
-
+			regInternalFindNextExpiry()
 		}
 	}
 }
@@ -254,18 +295,23 @@ func JobAdd(job *JobRequest) bool {
 }
 
 func regintAddJob(req *registryRequest, resp *registryResponse) {
-	if nil != req.job {
-		// ensure that the players are sorted!
-		sort.Strings(req.job.Players)
-		// update the state
-		req.job.updateState()
-		// and register the job
+	if nil == req.job {
+		return
+	}
+	// ensure that the players are sorted!
+	sort.Strings(req.job.Players)
+	// update the state
+	req.job.updateState()
+	// and register the job
+	_, overwrite := jobRegister[req.job.Id]
+	if !overwrite {
 		jobRegister[req.job.Id] = req.job
 		// force a queue update.
-		req.job.UpdateJobInformation()
+		req.job.UpdateInSpool()
+		if req.job.State.Finished() {
+			regInternalMarkJobForExpiry(req.job)
+		}
 		resp.success = true
-	} else {
-		resp.success = false
 	}
 }
 
@@ -290,7 +336,31 @@ func regintGetJob(req *registryRequest, resp *registryResponse) {
 	if exists {
 		resp.jobs = make([]*JobRequest, 1)
 		resp.jobs[0] = job
+	} else {
+		o.Warn("Received Request for job%d which is not in memory", req.id)
+		go regintGetJobDeferred(req.id, req.responseChannel)
+		// mask out the responseChannel so the deferred handler can use it.
+		req.responseChannel = nil
 	}
+}
+
+func regintGetJobDeferred(jobid uint64, responseChannel chan<- *registryResponse) {
+	resp := new(registryResponse)
+	resp.success = false
+	defer func (resp *registryResponse, rChan chan<- *registryResponse) {
+		rChan <- resp;
+	}(resp, responseChannel)
+
+	req, err := LoadFromFinished(jobid)
+	if err != nil {
+		o.Warn("Couldn't load job%d from disk.  Doesn't exist?", jobid)
+		return
+	}
+	// fix up the state, and stuff it back into the system
+	RestoreJobState(req)
+	resp.jobs = make([]*JobRequest, 1)
+	resp.jobs[0] = req
+	resp.success = true
 }
 
 // Attach a result to a Job in the Registry
@@ -314,7 +384,7 @@ func regintAddJobResult(req *registryRequest, resp *registryResponse) {
 	if exists {
 		job.Results[req.hostname] = req.tresp
 		// force a queue update.
-		job.UpdateJobInformation()
+		job.UpdateInSpool()
 	}
 }
 
@@ -391,7 +461,7 @@ func regintDisqualifyPlayer(req *registryRequest, resp *registryResponse) {
 			job.Players = newplayers
 			job.updateState()
 			// force a queue update.
-			job.UpdateJobInformation()
+			job.UpdateInSpool()
 		} else {
 			resp.success = false
 		}
@@ -417,7 +487,7 @@ func regintReviewJobStatus(req *registryRequest, resp *registryResponse) {
 	if exists {
 		job.updateState()
 		// force a queue update.
-		job.UpdateJobInformation()
+		job.UpdateInSpool()
 	}
 }
 
@@ -432,7 +502,7 @@ func regintWriteJobUpdate(req *registryRequest, resp *registryResponse) {
 	job, exists := jobRegister[req.id]
 	resp.success = exists
 	if exists {
-		job.UpdateJobInformation()
+		job.UpdateInSpool()
 	}
 }
 
@@ -448,7 +518,7 @@ func JobWriteAll() bool {
 
 func regintWriteJobAll(req *registryRequest, resp *registryResponse) {
 	for _, job := range jobRegister {
-		job.UpdateJobInformation()
+		job.UpdateInSpool()
 	}
 	resp.success = true
 }
@@ -510,7 +580,7 @@ func (job *JobRequest) updateState() {
 		}
 	}
 	if !was_finished && job.State.Finished() {
-		o.Debug("job%d: Finished - Setting Expiry Time")
-		job.expirytime = time.Nanoseconds() + jobLingerTime
+		o.Debug("job%d: Finished - Setting Expiry Time", job.Id)
+		regInternalMarkJobForExpiry(job)
 	}
 }

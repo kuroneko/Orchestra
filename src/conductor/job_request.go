@@ -113,9 +113,22 @@ func (req *JobRequest) doSerialisation(buf []byte) {
 	fh.Write(buf)
 }
 
-func (req *JobRequest) UpdateJobInformation()  {
+func (req *JobRequest) UpdateInSpool()  {
 	buf, err := json.MarshalIndent(req, "", "  ")
 	o.MightFail(err, "Failed to marshal job %d", req.Id)
 	//FIXME: should try to do this out of the registry's thread.
 	req.doSerialisation(buf)
+}
+
+// deserialise the job record from the finished spool
+func LoadFromFinished(jobid uint64) (req *JobRequest, err os.Error) {
+	fpath := path.Join(GetSpoolDirectory(), "finished", FilenameForJobId(jobid))
+	fh, err := os.Open(fpath)
+	if err != nil {
+		return nil, err
+	}
+	defer fh.Close()
+	
+	req, err = JobRequestFromReader(fh)
+	return req, err
 }
