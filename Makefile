@@ -1,7 +1,7 @@
 #
 # version of Orchestra
 #
-VERSION=0.2.0
+VERSION=0.3.0
 
 #
 # packaging revision.
@@ -14,7 +14,7 @@ REVISION=1
 # build/source path, and not use the system directories.
 #
 GOPATH=$(PWD)/build-tree:$(PWD)
-GOINSTALL_FLAGS=-dashboard=false -clean=true -u=false -log=false -make=false
+GOINSTALL_FLAGS=-dashboard=false -clean=true -u=false -make=false
 
 export GOPATH
 
@@ -40,7 +40,7 @@ distclean:
 
 deps:	distclean build-tree
 	mkdir -p build-tree/src/github.com/kuroneko && cd build-tree/src/github.com/kuroneko && git clone http://github.com/kuroneko/configureit.git && cd configureit && git checkout v0.1
-	mkdir -p build-tree/src/goprotobuf.googlecode.com && cd build-tree/src/goprotobuf.googlecode.com && hg clone -r release.r59 http://goprotobuf.googlecode.com/hg
+	mkdir -p build-tree/src/goprotobuf.googlecode.com && cd build-tree/src/goprotobuf.googlecode.com && hg clone -r go.r60 http://goprotobuf.googlecode.com/hg
 
 archive.deps:	deps
 	tar czf ../orchestra-deps-$(VERSION).tgz --transform 's!^!orchestra-$(VERSION)/!' --exclude .git --exclude .hg build-tree/src 

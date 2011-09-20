@@ -1,3 +1,9 @@
+orchestra (0.3.0-0anchor1) unstable; urgency=low
+
+  * Update to golang r60.
+
+ -- Chris Collins <chris.collins@anchor.net.au>  Tue, 20 Sep 2011 14:27:37 +1000
+
 orchestra (0.2.0-0anchor1) unstable; urgency=low
 
   * Update to golang r59.

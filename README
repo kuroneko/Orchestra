@@ -78,11 +78,12 @@ Patches Included
 ================
 
  * json-unmarshal-immediate.diff : Fix for Go Bug #2170
+ * syslog-auto-reconnect.diff : Fix for Go Bug #2264
 
 New In This Release
 ===================
 
-v0.x.x:
+v0.3.0:
  * BUGFIX: Fixed conductor ignoring the last_id checkpoint file after
      clean shutdowns.
  * FEATUREFIX: Fix the exported fieldnames in the audience interface 
