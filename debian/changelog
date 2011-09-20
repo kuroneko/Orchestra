@@ -1,6 +1,7 @@
 orchestra (0.3.0-0anchor1) unstable; urgency=low
 
   * Update to golang r60.
+  * Update to upstream 0.3.0
 
  -- Chris Collins <chris.collins@anchor.net.au>  Tue, 20 Sep 2011 14:27:37 +1000
 
