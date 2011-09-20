@@ -67,4 +67,4 @@ debian.debian:
 	tar zcf ../orchestra_$(DEBIAN_VERSION).debian.tar.gz -C debian .
 
 debian.build-tree:	deps
-	tar zcf ../orchestra_$(DEBIAN_VERSION).orig-build-tree.tar.gz -C build-tree --exclude .git --exclude .hg .
+	tar zcf ../orchestra_$(DEBIAN_SRC_VERSION).orig-build-tree.tar.gz -C build-tree --exclude .git --exclude .hg .
