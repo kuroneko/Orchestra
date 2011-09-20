@@ -44,7 +44,7 @@ deps:	distclean build-tree
 	mkdir -p build-tree/src/goprotobuf.googlecode.com && cd build-tree/src/goprotobuf.googlecode.com && hg clone -r go.r60 http://goprotobuf.googlecode.com/hg
 
 archive.deps:	deps
-	tar czf ../orchestra-$(VERSION).build-tree.tar.gz -C build-tree --exclude .git --exclude .hg . 
+	tar czf ../orchestra-deps-$(VERSION).tar.gz -C build-tree --exclude .git --exclude .hg . 
 
 archive.release:	archive.deps
 	git archive --format=tar --prefix=orchestra-$(VERSION)/ v$(VERSION) | gzip -9c > ../orchestra-$(VERSION).tgz
