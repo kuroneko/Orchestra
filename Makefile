@@ -38,17 +38,33 @@ clean:
 distclean:
 	-$(RM) -r build-tree
 
+### NOTE:  Make sure the checkouts have the correct tags in the lines below!
 deps:	distclean build-tree
 	mkdir -p build-tree/src/github.com/kuroneko && cd build-tree/src/github.com/kuroneko && git clone http://github.com/kuroneko/configureit.git && cd configureit && git checkout v0.1
 	mkdir -p build-tree/src/goprotobuf.googlecode.com && cd build-tree/src/goprotobuf.googlecode.com && hg clone -r go.r60 http://goprotobuf.googlecode.com/hg
 
 archive.deps:	deps
-	tar czf ../orchestra-deps-$(VERSION).tgz --transform 's!^!orchestra-$(VERSION)/!' --exclude .git --exclude .hg build-tree/src 
+	tar czf ../orchestra-$(VERSION).build-tree.tar.gz -C build-tree --exclude .git --exclude .hg . 
 
 archive.release:	archive.deps
 	git archive --format=tar --prefix=orchestra-$(VERSION)/ v$(VERSION) | gzip -9c > ../orchestra-$(VERSION).tgz
 
-.PHONY : head.tgz
+.PHONY : debian debian.orig debian.debian debian.build-tree archive.deps archive.release archive.head
 
 archive.head:
 	git archive --format=tar --prefix=orchestra/ HEAD | gzip -9c > ../orchestra-HEAD.tgz
+
+DEBIAN_VERSION=$(shell dpkg-parsechangelog | grep -e 'Version:' | awk '{ print $$2 }')
+DEBIAN_SRC_VERSION=$(shell echo $(DEBIAN_VERSION) | cut -d- -f 1)
+
+debian:	debian.orig debian.debian debian.build-tree clean
+	cd .. && dpkg-source -b $(PWD)
+
+debian.orig:
+	git archive --format=tar --prefix=orchestra-$(DEBIAN_SRC_VERSION)/ v$(DEBIAN_SRC_VERSION) | gzip -9c > ../orchestra_$(DEBIAN_SRC_VERSION).orig.tar.gz
+
+debian.debian:
+	tar zcf ../orchestra_$(DEBIAN_VERSION).debian.tar.gz -C debian .
+
+debian.build-tree:	deps
+	tar zcf ../orchestra_$(DEBIAN_VERSION).build-tree.tar.gz -C build-tree --exclude .git --exclude .hg .
