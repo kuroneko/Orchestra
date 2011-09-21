@@ -1,6 +1,6 @@
-diff -r b0819469a6df src/pkg/syslog/syslog.go
---- a/src/pkg/syslog/syslog.go	Thu Sep 08 12:16:42 2011 +1000
-+++ b/src/pkg/syslog/syslog.go	Tue Sep 20 11:29:08 2011 +1000
+diff -r fd30c132d1bd src/pkg/syslog/syslog.go
+--- a/src/pkg/syslog/syslog.go	Mon Sep 19 12:32:07 2011 +1000
++++ b/src/pkg/syslog/syslog.go	Wed Sep 21 11:19:24 2011 +1000
 @@ -17,23 +17,66 @@
  type Priority int
  
@@ -17,52 +17,52 @@ diff -r b0819469a6df src/pkg/syslog/syslog.go
 -	LOG_DEBUG
 +	// these are internal and are used to detect when overrides
 +	// are in place.
-+	SeverityPresent = Priority(0x100)
-+	SeverityMask    = Priority(0x7)
-+	FacilityPresent = Priority(0x200)
-+	FacilityMask    = Priority(0x1f << 3)
++	severityPresent = Priority(0x100)
++	severityMask    = Priority(0x7)
++	facilityPresent = Priority(0x200)
++	facilityMask    = Priority(0x1f << 3)
 +
 +	// From the RFCs.  Names lifted from C.
-+	LOG_EMERG   = Priority(0) | SeverityPresent
-+	LOG_ALERT   = Priority(1) | SeverityPresent
-+	LOG_CRIT    = Priority(2) | SeverityPresent
-+	LOG_ERR     = Priority(3) | SeverityPresent
-+	LOG_WARNING = Priority(4) | SeverityPresent
-+	LOG_NOTICE  = Priority(5) | SeverityPresent
-+	LOG_INFO    = Priority(6) | SeverityPresent
-+	LOG_DEBUG   = Priority(7) | SeverityPresent
++	LOG_EMERG   = Priority(0) | severityPresent
++	LOG_ALERT   = Priority(1) | severityPresent
++	LOG_CRIT    = Priority(2) | severityPresent
++	LOG_ERR     = Priority(3) | severityPresent
++	LOG_WARNING = Priority(4) | severityPresent
++	LOG_NOTICE  = Priority(5) | severityPresent
++	LOG_INFO    = Priority(6) | severityPresent
++	LOG_DEBUG   = Priority(7) | severityPresent
 +
-+	LOG_KERN     = Priority(0<<3) | FacilityPresent
-+	LOG_USER     = Priority(1<<3) | FacilityPresent
-+	LOG_MAIL     = Priority(2<<3) | FacilityPresent
-+	LOG_DAEMON   = Priority(3<<3) | FacilityPresent
-+	LOG_AUTH     = Priority(4<<3) | FacilityPresent
-+	LOG_SYSLOG   = Priority(5<<3) | FacilityPresent
-+	LOG_LPR      = Priority(6<<3) | FacilityPresent
-+	LOG_NEWS     = Priority(7<<3) | FacilityPresent
-+	LOG_UUCP     = Priority(8<<3) | FacilityPresent
-+	LOG_CRON     = Priority(9<<3) | FacilityPresent
-+	LOG_AUTHPRIV = Priority(10<<3) | FacilityPresent
-+	LOG_FTP      = Priority(11<<3) | FacilityPresent
-+	LOG_LOCAL0   = Priority(16<<3) | FacilityPresent
-+	LOG_LOCAL1   = Priority(17<<3) | FacilityPresent
-+	LOG_LOCAL2   = Priority(18<<3) | FacilityPresent
-+	LOG_LOCAL3   = Priority(19<<3) | FacilityPresent
-+	LOG_LOCAL4   = Priority(20<<3) | FacilityPresent
-+	LOG_LOCAL5   = Priority(21<<3) | FacilityPresent
-+	LOG_LOCAL6   = Priority(22<<3) | FacilityPresent
-+	LOG_LOCAL7   = Priority(23<<3) | FacilityPresent
++	LOG_KERN     = Priority(0<<3) | facilityPresent
++	LOG_USER     = Priority(1<<3) | facilityPresent
++	LOG_MAIL     = Priority(2<<3) | facilityPresent
++	LOG_DAEMON   = Priority(3<<3) | facilityPresent
++	LOG_AUTH     = Priority(4<<3) | facilityPresent
++	LOG_SYSLOG   = Priority(5<<3) | facilityPresent
++	LOG_LPR      = Priority(6<<3) | facilityPresent
++	LOG_NEWS     = Priority(7<<3) | facilityPresent
++	LOG_UUCP     = Priority(8<<3) | facilityPresent
++	LOG_CRON     = Priority(9<<3) | facilityPresent
++	LOG_AUTHPRIV = Priority(10<<3) | facilityPresent
++	LOG_FTP      = Priority(11<<3) | facilityPresent
++	LOG_LOCAL0   = Priority(16<<3) | facilityPresent
++	LOG_LOCAL1   = Priority(17<<3) | facilityPresent
++	LOG_LOCAL2   = Priority(18<<3) | facilityPresent
++	LOG_LOCAL3   = Priority(19<<3) | facilityPresent
++	LOG_LOCAL4   = Priority(20<<3) | facilityPresent
++	LOG_LOCAL5   = Priority(21<<3) | facilityPresent
++	LOG_LOCAL6   = Priority(22<<3) | facilityPresent
++	LOG_LOCAL7   = Priority(23<<3) | facilityPresent
  )
  
 +// splicePriority takes origPri, and mixes in a severity or facility
 +// if present in mixPri.
 +func splicePriority(origPri, mixPri Priority) (newPri Priority) {
 +	newPri = origPri
-+	if (mixPri & SeverityPresent) == SeverityPresent {
-+		newPri = (newPri & ^SeverityMask) | (mixPri & SeverityMask)
++	if (mixPri & severityPresent) == severityPresent {
++		newPri = (newPri & ^severityMask) | (mixPri & severityMask)
 +	}
-+	if (mixPri & FacilityPresent) == FacilityPresent {
-+		newPri = (newPri & ^FacilityMask) | (mixPri & FacilityMask)
++	if (mixPri & facilityPresent) == facilityPresent {
++		newPri = (newPri & ^facilityMask) | (mixPri & facilityMask)
 +	}
 +	return newPri
 +}
@@ -78,7 +78,7 @@ diff -r b0819469a6df src/pkg/syslog/syslog.go
  }
  
  type serverConn interface {
-@@ -53,38 +96,104 @@
+@@ -53,38 +96,86 @@
  	return Dial("", "", priority, prefix)
  }
  
@@ -102,7 +102,6 @@ diff -r b0819469a6df src/pkg/syslog/syslog.go
 +// Actually perform a real reconnect, closing any connections that may be open.
 +func (w *Writer) Reconnect() (err os.Error) {
 +	if w.conn != nil {
-+		log.Printf("writer.Reconnect() on old connection.\n")
 +		w.conn.close()
 +		w.conn = nil
 +	}
@@ -137,17 +136,30 @@ diff -r b0819469a6df src/pkg/syslog/syslog.go
 -func (w *Writer) Write(b []byte) (int, os.Error) {
 -	if w.priority > LOG_DEBUG || w.priority < LOG_EMERG {
 -		return 0, os.EINVAL
+-	}
+-	return w.conn.writeBytes(w.priority, w.prefix, b)
 +func (w *Writer) Write(b []byte) (bout int, err os.Error) {
++	return w.writeBytes(0, b)
+ }
+ 
+-func (w *Writer) writeString(p Priority, s string) (int, os.Error) {
+-	return w.conn.writeString(p, w.prefix, s)
++func (w *Writer) writeString(p Priority, s string) (bout int, err os.Error) {
++	return w.writeBytes(p, []byte(s))
+ }
+ 
+-func (w *Writer) Close() os.Error { return w.conn.close() }
++func (w *Writer) writeBytes(p Priority, b []byte) (bout int, err os.Error) {
++	msgpriority := splicePriority(w.priority, p)
 +	if w.conn == nil {
 +		err = w.Reconnect()
 +		if err != nil {
 +			return 0, err
 +		}
- 	}
--	return w.conn.writeBytes(w.priority, w.prefix, b)
++	}
 +	retried := false
 +retry:
-+	bout, err = w.conn.writeBytes(w.priority, w.prefix, b)
++	bout, err = w.conn.writeBytes(msgpriority, w.prefix, b)
 +
 +	if canRetry(err) && !retried {
 +		retried = true
@@ -158,37 +170,8 @@ diff -r b0819469a6df src/pkg/syslog/syslog.go
 +		goto retry
 +	}
 +	return bout, err
- }
- 
--func (w *Writer) writeString(p Priority, s string) (int, os.Error) {
--	return w.conn.writeString(p, w.prefix, s)
-+func (w *Writer) writeString(p Priority, s string) (bout int, err os.Error) {
-+	msgpriority := splicePriority(w.priority, p)
-+	if w.conn == nil {
-+		err := w.Reconnect()
-+		if err != nil {
-+			return 0, err
-+		}
-+	}
-+	retried := false
-+retry:
-+	bout, err = w.conn.writeString(msgpriority, w.prefix, s)
-+	if canRetry(err) && !retried {
-+		log.Printf("Retrying: %s", err)
-+		if err == os.ECONNREFUSED {
-+			log.Printf("Hit!")
-+		}
-+		retried = true
-+		err = w.Reconnect()
-+		if err != nil {
-+			return 0, err
-+		}
-+		goto retry
-+	}
-+	return bout, err
- }
- 
--func (w *Writer) Close() os.Error { return w.conn.close() }
++}
++
 +func (w *Writer) Close() os.Error {
 +	if w.conn != nil {
 +		return w.conn.close()
@@ -198,7 +181,7 @@ diff -r b0819469a6df src/pkg/syslog/syslog.go
  
  // Emerg logs a message using the LOG_EMERG priority.
  func (w *Writer) Emerg(m string) (err os.Error) {
-@@ -124,15 +233,15 @@
+@@ -124,15 +215,15 @@
  	return err
  }
  
@@ -219,9 +202,9 @@ diff -r b0819469a6df src/pkg/syslog/syslog.go
  	return n.conn.Close()
  }
  
-diff -r b0819469a6df src/pkg/syslog/syslog_test.go
---- a/src/pkg/syslog/syslog_test.go	Thu Sep 08 12:16:42 2011 +1000
-+++ b/src/pkg/syslog/syslog_test.go	Tue Sep 20 11:29:08 2011 +1000
+diff -r fd30c132d1bd src/pkg/syslog/syslog_test.go
+--- a/src/pkg/syslog/syslog_test.go	Mon Sep 19 12:32:07 2011 +1000
++++ b/src/pkg/syslog/syslog_test.go	Wed Sep 21 11:19:24 2011 +1000
 @@ -7,11 +7,14 @@
  	"io"
  	"log"
@@ -371,9 +354,9 @@ diff -r b0819469a6df src/pkg/syslog/syslog_test.go
  	l, err := Dial("udp", serverAddr, LOG_ERR, "syslog_test")
  	if err != nil {
  		t.Fatalf("syslog.Dial() failed: %s", err)
-diff -r b0819469a6df src/pkg/syslog/syslog_unix.go
---- a/src/pkg/syslog/syslog_unix.go	Thu Sep 08 12:16:42 2011 +1000
-+++ b/src/pkg/syslog/syslog_unix.go	Tue Sep 20 11:29:08 2011 +1000
+diff -r fd30c132d1bd src/pkg/syslog/syslog_unix.go
+--- a/src/pkg/syslog/syslog_unix.go	Mon Sep 19 12:32:07 2011 +1000
++++ b/src/pkg/syslog/syslog_unix.go	Wed Sep 21 11:19:24 2011 +1000
 @@ -23,7 +23,7 @@
  			if err != nil {
  				continue
