@@ -355,7 +355,7 @@ func ProcessingLoop() {
 			if conn == nil {
 				break
 			}
-			o.Debug("Sending Nop")
+			o.Debug("Sending NOP")
 			p := o.MakeNop()
 			p.Send(conn)
 		}
