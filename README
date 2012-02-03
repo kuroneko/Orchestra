@@ -77,7 +77,8 @@ go-patches/ -- Patches against the Release version of Go to fix
 Patches Included
 ================
 
- * json-unmarshal-immediate.diff : Fix for Go Bug #2170
+ * json-unmarshal-immediate.diff : Fix for Go Bug #2170 
+     (Not needed after weekly.2012-02-03 / r61 (if it ever happens))
  * syslog-auto-reconnect.diff : Fix for Go Bug #2264
 
 New In This Release
