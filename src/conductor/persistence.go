@@ -3,15 +3,15 @@
 package main
 
 import (
-	"fmt"
-	"path"
-	"os"
-	"unicode"
-	"strconv"
-	"sync/atomic"
 	"bufio"
-	"strings"
+	"fmt"
 	o "orchestra"
+	"os"
+	"path"
+	"strconv"
+	"strings"
+	"sync/atomic"
+	"unicode"
 )
 
 // changing this will result in fire.  you have been warned.
@@ -36,9 +36,8 @@ func GetSpoolDirectory() string {
 	return spoolDirectory
 }
 
-
 const (
-	IdCheckpointSafetySkip = 10e4  // Skip 10e4 entries if orchestra didn't shutdown cleanly for safety.
+	IdCheckpointSafetySkip = 10e4 // Skip 10e4 entries if orchestra didn't shutdown cleanly for safety.
 )
 
 var lastId uint64 = 0
@@ -59,7 +58,7 @@ func loadLastId() {
 		// we have a checkpoint file.  blah.
 		cbio := bufio.NewReader(fh)
 		l, err := cbio.ReadString('\n')
-		lastId, err = strconv.Atoui64(strings.TrimSpace(l))
+		lastId, err = strconv.ParseUint(strings.TrimSpace(l), 10, 64)
 		if err != nil {
 			o.Fail("Couldn't read Last ID from checkpoint file.  Aborting for safety.")
 		}
@@ -69,19 +68,19 @@ func loadLastId() {
 		if !ok || pe.Error != os.ENOENT {
 			o.Fail("Found checkpoint file, but couldn't open it: %s", err)
 		}
-		fh,err := os.Open(savePath())
+		fh, err := os.Open(savePath())
 		if err != nil {
 			pe, ok = err.(*os.PathError)
 			if !ok || pe.Error == os.ENOENT {
-				lastId = 0;
-				return;
+				lastId = 0
+				return
 			}
 			o.MightFail(err, "Couldn't open last_id file")
 		}
 		defer fh.Close()
 		cbio := bufio.NewReader(fh)
 		l, err := cbio.ReadString('\n')
-		lastId, err = strconv.Atoui64(strings.TrimSpace(l))
+		lastId, err = strconv.ParseUint(strings.TrimSpace(l), 10, 64)
 		if err != nil {
 			o.Fail("Couldn't read Last ID from last_id.  Aborting for safety.")
 		}
@@ -119,7 +118,7 @@ func NextRequestId() uint64 {
 func FilenameForJobId(jobid uint64) (fullpath string) {
 	fnbits := make([]string, bucketDepth+1)
 	for i := 0; i < bucketDepth; i++ {
-		fnbits[i] = fmt.Sprintf("%01X", (jobid >> uint(i*4)) & 0xF)
+		fnbits[i] = fmt.Sprintf("%01X", (jobid>>uint(i*4))&0xF)
 	}
 	fnbits[bucketDepth] = fmt.Sprintf("%016X", jobid)
 
@@ -129,7 +128,7 @@ func FilenameForJobId(jobid uint64) (fullpath string) {
 func makeSpoolDirInner(prefix string, depth int) {
 	for i := 0; i < 16; i++ {
 		dirname := path.Join(prefix, fmt.Sprintf("%01X", i))
-		if (depth == 1) {
+		if depth == 1 {
 			err := os.MkdirAll(dirname, 0700)
 			o.MightFail(err, "Couldn't make directory building spool tree")
 		} else {
@@ -172,11 +171,11 @@ func loadSpoolFiles(dirname string, depth int) {
 			if n.IsDirectory() {
 				// if not a single character, it's not a spool node.
 				if len(n.Name) != 1 {
-					continue;
+					continue
 				}
 				if n.Name == "." {
 					// we're not interested in .
-					continue;
+					continue
 				}
 				nrunes := []int(n.Name)
 				if unicode.Is(unicode.ASCII_Hex_Digit, nrunes[0]) {
@@ -195,7 +194,7 @@ func loadSpoolFiles(dirname string, depth int) {
 					shuffleToCorrupted(abspath, "Filename incorrect length")
 					continue
 				}
-				id, err := strconv.Btoui64(n.Name, 16)
+				id, err := strconv.ParseUint(n.Name, 16, 64)
 				if err != nil {
 					shuffleToCorrupted(abspath, "Invalid Filename")
 					continue
@@ -237,7 +236,7 @@ func RestoreJobState(job *JobRequest) bool {
 			}
 			// remove it so we can sweep it in pass2 for
 			// results from old hosts that matter.
-			job.Results[p] = nil, false
+			delete(job.Results, p)
 		}
 	}
 	job.Players = playersout
@@ -292,7 +291,7 @@ func RestoreJobState(job *JobRequest) bool {
 	// put the job back into the system.
 	JobAdd(job)
 	JobReviewState(job.Id)
-	if (!job.State.Finished()) {
+	if !job.State.Finished() {
 		// now, redispatch anything that's not actually finished.
 		for _, t := range job.Tasks {
 			if !t.State.Finished() {

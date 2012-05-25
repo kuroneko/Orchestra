@@ -2,13 +2,10 @@
 
 package main
 
-import (
-	"os"
-	"json"
-)
+import "encoding/json"
 
 const (
-	SCOPE_INVALID		= JobScope(iota)
+	SCOPE_INVALID = JobScope(iota)
 	SCOPE_ONEOF
 	SCOPE_ALLOF
 )
@@ -27,7 +24,7 @@ func (js JobScope) String() (strout string) {
 	return strout
 }
 
-func (js JobScope) MarshalJSON() (out []byte, err os.Error) {
+func (js JobScope) MarshalJSON() (out []byte, err error) {
 	strout := js.String()
 	if strout != "" {
 		return json.Marshal(strout)
@@ -35,7 +32,7 @@ func (js JobScope) MarshalJSON() (out []byte, err os.Error) {
 	return nil, InvalidValueError
 }
 
-func (js *JobScope) UnmarshalJSON(in []byte) (err os.Error) {
+func (js *JobScope) UnmarshalJSON(in []byte) (err error) {
 	var scopestr string
 	err = json.Unmarshal(in, &scopestr)
 	if err != nil {

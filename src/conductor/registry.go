@@ -8,10 +8,10 @@
 package main
 
 import (
+	"container/list"
 	o "orchestra"
 	"sort"
 	"time"
-	"container/list"
 )
 
 // Request Types
@@ -32,38 +32,38 @@ const (
 	requestWriteJobUpdate
 	requestWriteJobAll
 
-	requestQueueSize		= 10
+	requestQueueSize = 10
 
-	jobLingerTime			= int64(30e9)
+	jobLingerTime = int64(30e9)
 )
 
 type registryRequest struct {
-	operation		int
-	id			uint64
-	hostname		string
-	hostlist		[]string
-	job			*JobRequest
-	tresp			*TaskResponse
-	responseChannel		chan *registryResponse
+	operation       int
+	id              uint64
+	hostname        string
+	hostlist        []string
+	job             *JobRequest
+	tresp           *TaskResponse
+	responseChannel chan *registryResponse
 }
 
 type registryResponse struct {
-	success			bool
-	info			*ClientInfo
-	tresp			*TaskResponse
-	names			[]string
-	jobs			[]*JobRequest
+	success bool
+	info    *ClientInfo
+	tresp   *TaskResponse
+	names   []string
+	jobs    []*JobRequest
 }
 
 var (
-	chanRegistryRequest	= make(chan *registryRequest, requestQueueSize)
- 	clientList 		= make(map[string]*ClientInfo)
-	jobRegister 		= make(map[uint64]*JobRequest)
-	expiryChan		<-chan int64
-	expiryJobid 		uint64
-	expiryList		*list.List
+	chanRegistryRequest = make(chan *registryRequest, requestQueueSize)
+	clientList          = make(map[string]*ClientInfo)
+	jobRegister         = make(map[uint64]*JobRequest)
+	expiryChan          <-chan int64
+	expiryJobid         uint64
+	expiryList          *list.List
 
-	expiryLoopFudge 	int64 = 10e6; /* 10 ms should be enough fudgefactor */
+	expiryLoopFudge int64 = 10e6 /* 10 ms should be enough fudgefactor */
 )
 
 func init() {
@@ -81,14 +81,14 @@ func regInternalAdd(hostname string) {
 func regInternalDel(hostname string) {
 	o.Warn("Registry: Deleting Host \"%s\"", hostname)
 	/* remove it from the registry */
-	clientList[hostname] = nil, false
+	delete(clientList, hostname)
 }
 
 func regInternalExpireJob(jobid uint64) {
 	job, exists := jobRegister[jobid]
 	if exists {
 		if job.State.Finished() {
-			jobRegister[jobid] = nil, false
+			delete(jobRegister, jobid)
 		} else {
 			o.Assert("Tried to expire incomplete job.")
 		}
@@ -110,17 +110,17 @@ func regInternalFindNextExpiry() {
 		if !ok {
 			o.Assert("item in expiryList not a *JobRequest")
 		}
-		if (time.Nanoseconds() + expiryLoopFudge) > req.expirytime {
+		if (time.Now() + expiryLoopFudge) > req.expirytime {
 			regInternalExpireJob(req.Id)
 		} else {
-			expiryChan = time.After(req.expirytime - time.Nanoseconds())
+			expiryChan = time.After(req.expirytime.Sub(time.Now()))
 			expiryJobid = req.Id
 		}
 	}
 }
 
 func regInternalMarkJobForExpiry(job *JobRequest) {
-	job.expirytime = time.Nanoseconds() + jobLingerTime
+	job.expirytime = time.Now() + jobLingerTime
 	expiryList.PushBack(job)
 	// if there is no job pending expiry, feed it into the delay loop
 	if expiryChan == nil {
@@ -128,20 +128,20 @@ func regInternalMarkJobForExpiry(job *JobRequest) {
 	}
 }
 
-var registryHandlers = map[int] func(*registryRequest, *registryResponse) {
-requestAddClient:	regintAddClient,
-requestGetClient:	regintGetClient,
-requestDeleteClient:	regintDeleteClient,
-requestSyncClients:	regintSyncClients,
-requestAddJob:		regintAddJob,
-requestGetJob:		regintGetJob,
-requestAddJobResult:	regintAddJobResult,
-requestGetJobResult:	regintGetJobResult,
-requestGetJobResultNames:	regintGetJobResultNames,
-requestDisqualifyPlayer:	regintDisqualifyPlayer,
-requestReviewJobStatus:	regintReviewJobStatus,
-requestWriteJobUpdate:	regintWriteJobUpdate,
-requestWriteJobAll:	regintWriteJobAll,
+var registryHandlers = map[int]func(*registryRequest, *registryResponse){
+	requestAddClient:         regintAddClient,
+	requestGetClient:         regintGetClient,
+	requestDeleteClient:      regintDeleteClient,
+	requestSyncClients:       regintSyncClients,
+	requestAddJob:            regintAddJob,
+	requestGetJob:            regintGetJob,
+	requestAddJobResult:      regintAddJobResult,
+	requestGetJobResult:      regintGetJobResult,
+	requestGetJobResultNames: regintGetJobResultNames,
+	requestDisqualifyPlayer:  regintDisqualifyPlayer,
+	requestReviewJobStatus:   regintReviewJobStatus,
+	requestWriteJobUpdate:    regintWriteJobUpdate,
+	requestWriteJobAll:       regintWriteJobAll,
 }
 
 func manageRegistry() {
@@ -180,14 +180,14 @@ func newRequest(wants_response bool) (req *registryRequest) {
 
 	return req
 }
-	
+
 func ClientAdd(hostname string) (success bool) {
 	r := newRequest(true)
 	r.operation = requestAddClient
 	r.hostname = hostname
 	chanRegistryRequest <- r
-	resp := <- r.responseChannel
-	
+	resp := <-r.responseChannel
+
 	return resp.success
 }
 
@@ -206,8 +206,8 @@ func ClientDelete(hostname string) (success bool) {
 	r.operation = requestDeleteClient
 	r.hostname = hostname
 	chanRegistryRequest <- r
-	resp := <- r.responseChannel
-	
+	resp := <-r.responseChannel
+
 	return resp.success
 }
 
@@ -226,7 +226,7 @@ func ClientGet(hostname string) (info *ClientInfo) {
 	r.operation = requestGetClient
 	r.hostname = hostname
 	chanRegistryRequest <- r
-	resp := <- r.responseChannel
+	resp := <-r.responseChannel
 	if resp.success {
 		return resp.info
 	}
@@ -246,7 +246,7 @@ func regintGetClient(req *registryRequest, resp *registryResponse) {
 func ClientUpdateKnown(hostnames []string) {
 	/* this is an asynchronous, we feed it into the registry 
 	 * and it'll look after itself.
-	*/
+	 */
 	r := newRequest(false)
 	r.operation = requestSyncClients
 	r.hostlist = hostnames
@@ -259,23 +259,23 @@ func regintSyncClients(req *registryRequest, resp *registryResponse) {
 	//
 	// First, we transform the array into a map
 	newhosts := make(map[string]bool)
-	for k,_ := range req.hostlist {
+	for k, _ := range req.hostlist {
 		newhosts[req.hostlist[k]] = true
 	}
 	// now, scan the current list, checking to see if they exist.
 	// Remove them from the newhosts map if they do exist.
-	for k,_ := range clientList {
+	for k, _ := range clientList {
 		_, exists := newhosts[k]
 		if exists {
 			// remove it from the newhosts map
-			newhosts[k] = false, false
+			delete(newhosts, k)
 		} else {
 			regInternalDel(k)
 		}
 	}
 	// now that we're finished, we should only have new clients in
 	// the newhosts list left.
-	for k,_ := range newhosts {
+	for k, _ := range newhosts {
 		regInternalAdd(k)
 	}
 	// and we're done.
@@ -290,7 +290,7 @@ func JobAdd(job *JobRequest) bool {
 	rr.job = job
 
 	chanRegistryRequest <- rr
-	resp := <- rr.responseChannel 
+	resp := <-rr.responseChannel
 	return resp.success
 }
 
@@ -323,7 +323,7 @@ func JobGet(id uint64) *JobRequest {
 	rr.id = id
 
 	chanRegistryRequest <- rr
-	resp := <- rr.responseChannel
+	resp := <-rr.responseChannel
 	if resp.jobs == nil {
 		return nil
 	}
@@ -347,8 +347,8 @@ func regintGetJob(req *registryRequest, resp *registryResponse) {
 func regintGetJobDeferred(jobid uint64, responseChannel chan<- *registryResponse) {
 	resp := new(registryResponse)
 	resp.success = false
-	defer func (resp *registryResponse, rChan chan<- *registryResponse) {
-		rChan <- resp;
+	defer func(resp *registryResponse, rChan chan<- *registryResponse) {
+		rChan <- resp
 	}(resp, responseChannel)
 
 	req, err := LoadFromFinished(jobid)
@@ -374,7 +374,7 @@ func JobAddResult(playername string, task *TaskResponse) bool {
 	rr.tresp = task
 	rr.hostname = playername
 	chanRegistryRequest <- rr
-	resp := <- rr.responseChannel
+	resp := <-rr.responseChannel
 	return resp.success
 }
 
@@ -395,7 +395,7 @@ func JobGetResult(id uint64, playername string) (tresp *TaskResponse) {
 	rr.id = id
 	rr.hostname = playername
 	chanRegistryRequest <- rr
-	resp := <- rr.responseChannel
+	resp := <-rr.responseChannel
 	return resp.tresp
 }
 
@@ -419,7 +419,7 @@ func JobGetResultNames(id uint64) (names []string) {
 	rr.id = id
 
 	chanRegistryRequest <- rr
-	resp := <- rr.responseChannel 
+	resp := <-rr.responseChannel
 	return resp.names
 }
 
@@ -444,7 +444,7 @@ func JobDisqualifyPlayer(id uint64, playername string) bool {
 	rr.hostname = playername
 
 	chanRegistryRequest <- rr
-	resp := <- rr.responseChannel
+	resp := <-rr.responseChannel
 
 	return resp.success
 }
@@ -453,7 +453,7 @@ func regintDisqualifyPlayer(req *registryRequest, resp *registryResponse) {
 	job, exists := jobRegister[req.id]
 	if exists {
 		idx := sort.Search(len(job.Players), func(idx int) bool { return job.Players[idx] >= req.hostname })
-		if (job.Players[idx] == req.hostname) {
+		if job.Players[idx] == req.hostname {
 			resp.success = true
 			newplayers := make([]string, len(job.Players)-1)
 			copy(newplayers[0:idx], job.Players[0:idx])
@@ -476,7 +476,7 @@ func JobReviewState(id uint64) bool {
 	rr.id = id
 
 	chanRegistryRequest <- rr
-	resp := <- rr.responseChannel
+	resp := <-rr.responseChannel
 
 	return resp.success
 }
@@ -556,8 +556,8 @@ func (job *JobRequest) updateState() {
 		}
 	case SCOPE_ALLOF:
 		var success int = 0
-		var failed  int = 0
-		
+		var failed int = 0
+
 		for pidx := range job.Players {
 			p := job.Players[pidx]
 			resp, exists := job.Results[p]

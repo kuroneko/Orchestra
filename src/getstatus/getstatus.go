@@ -5,28 +5,28 @@
 package main
 
 import (
-	"io"
-	"net"
-	"json"
+	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
+	"net"
 	"os"
 	"strconv"
 )
 
 type StatusRequest struct {
-	Op	string	`json:"op"`
-	Id	uint64	`json:"id"`
+	Op string `json:"op"`
+	Id uint64 `json:"id"`
 }
 
 type PlayerStatus struct {
-	Status		*string		`json:"status"`
-	Response	map[string]*string	`json:"response"`
+	Status   *string            `json:"status"`
+	Response map[string]*string `json:"response"`
 }
 
 type StatusResponse struct {
-	Status		*string		`json:"status"`
-	Players		map[string]*PlayerStatus	`json:"players"`
+	Status  *string                  `json:"status"`
+	Players map[string]*PlayerStatus `json:"players"`
 }
 
 var (
@@ -55,13 +55,13 @@ func main() {
 	}
 
 	sr := NewStatusRequest()
-	var err os.Error
-	sr.Id, err = strconv.Atoui64(flag.Arg(0))
+	var err error
+	sr.Id, err = strconv.ParseUint(flag.Arg(0), 10, 64)
 	if nil != err {
 		fmt.Fprintf(os.Stderr, "Failed to parse JobID: %s\n", err)
 		os.Exit(1)
 	}
-	
+
 	raddr, err := net.ResolveUnixAddr("unix", *AudienceSock)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to resolve sockaddr: %s\n", err)
@@ -120,7 +120,7 @@ func main() {
 	}
 
 	// coerce field 0 back into a string.
-	rerr,ok := response[0].(string)
+	rerr, ok := response[0].(string)
 	if ok {
 		if rerr == "OK" {
 			// all OK, process the sresp.
@@ -131,7 +131,7 @@ func main() {
 			os.Exit(1)
 		}
 	} else {
-		fmt.Fprintf(os.Stderr, "Couldn't unmarshal response correctly.\n");
+		fmt.Fprintf(os.Stderr, "Couldn't unmarshal response correctly.\n")
 		os.Exit(1)
 	}
 }

@@ -1,18 +1,18 @@
 /* marshal.go
  *
  * Common wire marshalling code.
-*/
+ */
 
-package orchestra;
+package orchestra
 
 import (
-	"os"
-	"goprotobuf.googlecode.com/hg/proto"
+	"code.google.com/p/goprotobuf/proto"
+	"errors"
 )
 
 var (
-	ErrUnknownType = os.NewError("Unknown Type in Encode request")
-	ErrObjectTooLarge = os.NewError("Encoded Object exceeds maximum encoding size")
+	ErrUnknownType    = errors.New("Unknown Type in Encode request")
+	ErrObjectTooLarge = errors.New("Encoded Object exceeds maximum encoding size")
 )
 
 /* ugh ugh ugh.  As much as I love protocol buffers, not having maps
@@ -20,7 +20,7 @@ var (
  *
  * Here's some common code to convert my K/V format in protocol
  * buffers to and from native Go structures.
-*/
+ */
 func MapFromProtoJobParameters(parray []*ProtoJobParameter) (mapparam map[string]string) {
 	mapparam = make(map[string]string)
 
@@ -34,7 +34,7 @@ func MapFromProtoJobParameters(parray []*ProtoJobParameter) (mapparam map[string
 func ProtoJobParametersFromMap(mapparam map[string]string) (parray []*ProtoJobParameter) {
 	parray = make([]*ProtoJobParameter, len(mapparam))
 	i := 0
-	for k,v := range mapparam {
+	for k, v := range mapparam {
 		arg := new(ProtoJobParameter)
 		arg.Key = proto.String(k)
 		arg.Value = proto.String(v)
@@ -45,14 +45,12 @@ func ProtoJobParametersFromMap(mapparam map[string]string) (parray []*ProtoJobPa
 	return parray
 }
 
-
-
-func (p *WirePkt) Decode() (obj interface{}, err os.Error) {
-	switch (p.Type) {
+func (p *WirePkt) Decode() (obj interface{}, err error) {
+	switch p.Type {
 	case TypeNop:
-		if (p.Length != 0) {
+		if p.Length != 0 {
 			/* throw error later... */
-			return nil, ErrMalformedMessage;
+			return nil, ErrMalformedMessage
 		}
 		return nil, nil
 	case TypeIdentifyClient:
@@ -63,9 +61,9 @@ func (p *WirePkt) Decode() (obj interface{}, err os.Error) {
 		}
 		return ic, nil
 	case TypeReadyForTask:
-		if (p.Length != 0) {
+		if p.Length != 0 {
 			/* throw error later... */
-			return nil, ErrMalformedMessage;
+			return nil, ErrMalformedMessage
 		}
 		return nil, nil
 	case TypeTaskRequest:
@@ -93,7 +91,7 @@ func (p *WirePkt) Decode() (obj interface{}, err os.Error) {
 	return nil, ErrUnknownMessage
 }
 
-func Encode(obj interface{}) (p *WirePkt, err os.Error) {
+func Encode(obj interface{}) (p *WirePkt, err error) {
 	p = new(WirePkt)
 	switch obj.(type) {
 	case *IdentifyClient:
@@ -117,9 +115,8 @@ func Encode(obj interface{}) (p *WirePkt, err os.Error) {
 	}
 	p.Length = uint16(len(p.Payload))
 
-	return p, nil	
+	return p, nil
 }
-
 
 func MakeNop() (p *WirePkt) {
 	p = new(WirePkt)
@@ -135,11 +132,11 @@ func MakeIdentifyClient(hostname string) (p *WirePkt) {
 	s.Hostname = proto.String(hostname)
 
 	p, _ = Encode(s)
-	
+
 	return p
 }
 
-func MakeReadyForTask() (p *WirePkt){
+func MakeReadyForTask() (p *WirePkt) {
 	p = new(WirePkt)
 	p.Type = TypeReadyForTask
 	p.Length = 0

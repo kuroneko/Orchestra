@@ -2,16 +2,13 @@
 
 package main
 
-import (
-	"os"
-	"json"
-)
+import "encoding/json"
 
 type ResponseState int
 
 const (
 	// Response states
-	RESP_PENDING			= ResponseState(iota)	// internal state, not wire.
+	RESP_PENDING = ResponseState(iota) // internal state, not wire.
 	RESP_RUNNING
 	RESP_FINISHED
 	RESP_FAILED
@@ -38,7 +35,7 @@ func (rs ResponseState) String() (strout string) {
 	return ""
 }
 
-func (rs ResponseState) MarshalJSON() (out []byte, err os.Error) {
+func (rs ResponseState) MarshalJSON() (out []byte, err error) {
 	strout := rs.String()
 	if strout != "" {
 		return json.Marshal(strout)
@@ -46,7 +43,7 @@ func (rs ResponseState) MarshalJSON() (out []byte, err os.Error) {
 	return nil, InvalidValueError
 }
 
-func (rs ResponseState) UnmarshalJSON(in []byte) (err os.Error) {
+func (rs ResponseState) UnmarshalJSON(in []byte) (err error) {
 	var statestr string
 	err = json.Unmarshal(in, &statestr)
 	if err != nil {

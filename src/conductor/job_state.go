@@ -2,15 +2,12 @@
 
 package main
 
-import (
-	"os"
-	"json"
-)
+import "encoding/json"
 
 type JobState int
 
 const (
-	JOB_STATE_INVALID	= JobState(iota)
+	JOB_STATE_INVALID = JobState(iota)
 	// Job is pending resolution
 	JOB_PENDING
 	// Job has completed and has no failures.
@@ -45,7 +42,7 @@ func (js JobState) String() (strout string) {
 
 }
 
-func (js JobState) MarshalJSON() (out []byte, err os.Error) {
+func (js JobState) MarshalJSON() (out []byte, err error) {
 	strout := js.String()
 	if strout != "" {
 		return json.Marshal(strout)
@@ -53,7 +50,7 @@ func (js JobState) MarshalJSON() (out []byte, err os.Error) {
 	return nil, InvalidValueError
 }
 
-func (js *JobState) UnmarshalJSON(in []byte) (err os.Error) {
+func (js *JobState) UnmarshalJSON(in []byte) (err error) {
 	var statestr string
 	err = json.Unmarshal(in, &statestr)
 	if err != nil {
@@ -73,4 +70,3 @@ func (js *JobState) UnmarshalJSON(in []byte) (err os.Error) {
 	}
 	return nil
 }
-

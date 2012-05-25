@@ -1,48 +1,48 @@
 /* player.go
-*/
+ */
 
 package main
 
 import (
-	"os"
-	"fmt"
-	"flag"
-	o	"orchestra"
+	"container/list"
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
+	"flag"
+	"fmt"
 	"net"
+	o "orchestra"
 	"time"
-	"container/list"
 )
 
 const (
-	InitialReconnectDelay		= 5e9
-	MaximumReconnectDelay		= 300e9
-	ReconnectDelayScale		= 2
-	KeepaliveDelay 			= 200e9
-	RetryDelay			= 5e9
+	InitialReconnectDelay = 5e9
+	MaximumReconnectDelay = 300e9
+	ReconnectDelayScale   = 2
+	KeepaliveDelay        = 200e9
+	RetryDelay            = 5e9
 )
 
 type NewConnectionInfo struct {
-	conn net.Conn
+	conn    net.Conn
 	timeout int64
 }
 
 var (
-	ConfigFile		= flag.String("config-file", "/etc/orchestra/player.conf", "Path to the configuration file")	
-	DontVerifyPeer		= flag.Bool("dont-verify-peer", false, "Ignore TLS verification for the peer")
-	CertPair tls.Certificate
-	CACertPool *x509.CertPool
-	LocalHostname string	= ""
-	
- 	receivedMessage 	= make(chan *o.WirePkt)
-	lostConnection 		= make(chan int)
-	reloadScores		= make(chan int, 2)
-	pendingQueue		= list.New()
-	unacknowledgedQueue	= list.New()
-	newConnection		= make(chan *NewConnectionInfo)
-	pendingTaskRequest	= false
-	InvalidValueError	= os.NewError("Invalid value")
+	ConfigFile     = flag.String("config-file", "/etc/orchestra/player.conf", "Path to the configuration file")
+	DontVerifyPeer = flag.Bool("dont-verify-peer", false, "Ignore TLS verification for the peer")
+	CertPair       tls.Certificate
+	CACertPool     *x509.CertPool
+	LocalHostname  string = ""
+
+	receivedMessage     = make(chan *o.WirePkt)
+	lostConnection      = make(chan int)
+	reloadScores        = make(chan int, 2)
+	pendingQueue        = list.New()
+	unacknowledgedQueue = list.New()
+	newConnection       = make(chan *NewConnectionInfo)
+	pendingTaskRequest  = false
+	InvalidValueError   = errors.New("Invalid value")
 )
 
 func getNextPendingTask() (task *TaskRequest) {
@@ -69,7 +69,7 @@ func getNextUnacknowledgedResponse() (resp *TaskResponse) {
 }
 
 func appendUnacknowledgedResponse(resp *TaskResponse) {
-	resp.RetryTime = time.Nanoseconds() + RetryDelay
+	resp.RetryTime = time.Now() + RetryDelay
 	unacknowledgedQueue.PushBack(resp)
 }
 
@@ -110,12 +110,12 @@ func Reader(conn net.Conn) {
 
 	for {
 		pkt, err := o.Receive(conn)
-		if (err != nil) {
+		if err != nil {
 			o.Warn("Error receiving message: %s", err)
-			break;
+			break
 		}
 		receivedMessage <- pkt
-	}	
+	}
 }
 
 func handleNop(c net.Conn, message interface{}) {
@@ -137,7 +137,7 @@ func handleRequest(c net.Conn, message interface{}) {
 	o.Debug("Request for Job.ID %d", task.Id)
 	existing := TaskGet(task.Id)
 	if nil != existing {
-		if (existing.MyResponse.IsFinished()) {
+		if existing.MyResponse.IsFinished() {
 			o.Debug("job%d: Resending Response", task.Id)
 			sendResponse(c, existing.MyResponse)
 		}
@@ -146,7 +146,7 @@ func handleRequest(c net.Conn, message interface{}) {
 		// add the Job to our Registry
 		task.MyResponse = NewTaskResponse()
 		task.MyResponse.id = task.Id
-		task.MyResponse.State = RESP_PENDING		
+		task.MyResponse.State = RESP_PENDING
 		TaskAdd(task)
 		o.Info("Added New Task (Job ID %d) to our local registry", task.Id)
 		// and then push it onto the pending job list so we know it needs actioning.
@@ -165,16 +165,15 @@ func handleAck(c net.Conn, message interface{}) {
 	}
 }
 
-
-var dispatcher	= map[uint8] func(net.Conn, interface{}) {
-	o.TypeNop:		handleNop,
-	o.TypeTaskRequest:	handleRequest,
-	o.TypeAcknowledgement:	handleAck,
+var dispatcher = map[uint8]func(net.Conn, interface{}){
+	o.TypeNop:             handleNop,
+	o.TypeTaskRequest:     handleRequest,
+	o.TypeAcknowledgement: handleAck,
 
 	/* P->C only messages, should never appear on the wire to us. */
-	o.TypeIdentifyClient:	handleIllegal,
-	o.TypeReadyForTask:	handleIllegal,
-	o.TypeTaskResponse:	handleIllegal,
+	o.TypeIdentifyClient: handleIllegal,
+	o.TypeReadyForTask:   handleIllegal,
+	o.TypeTaskResponse:   handleIllegal,
 }
 
 func connectMe(initialDelay int64) {
@@ -194,13 +193,13 @@ func connectMe(initialDelay int64) {
 		}
 
 		tconf := &tls.Config{
-		RootCAs: CACertPool,
+			RootCAs: CACertPool,
 		}
 		tconf.Certificates = append(tconf.Certificates, CertPair)
 
 		// update our local hostname.
 		LocalHostname = GetStringOpt("player name")
-		if (LocalHostname == "") {
+		if LocalHostname == "" {
 			LocalHostname = o.ProbeHostname()
 			o.Warn("No hostname provided - probed hostname: %s", LocalHostname)
 		}
@@ -209,7 +208,7 @@ func connectMe(initialDelay int64) {
 
 		raddr := fmt.Sprintf("%s:%d", masterHostname, 2258)
 		o.Info("Connecting to %s", raddr)
-		conn, err := tls.Dial("tcp", raddr, tconf)		
+		conn, err := tls.Dial("tcp", raddr, tconf)
 		if err == nil && !*DontVerifyPeer {
 			conn.Handshake()
 			err = conn.VerifyHostname(masterHostname)
@@ -226,18 +225,18 @@ func connectMe(initialDelay int64) {
 }
 
 func ProcessingLoop() {
-	var	conn			net.Conn		= nil
-	var     nextRetryResp		*TaskResponse 		= nil
-	var	taskCompletionChan	<-chan *TaskResponse	= nil
-	var	connectDelay		int64			= 0
-	var	doScoreReload		bool			= false
+	var conn net.Conn = nil
+	var nextRetryResp *TaskResponse = nil
+	var taskCompletionChan <-chan *TaskResponse = nil
+	var connectDelay int64 = 0
+	var doScoreReload bool = false
 	// kick off a new connection attempt.
 	go connectMe(connectDelay)
 
 	// and this is where we spin!
-	for {	
+	for {
 		var retryDelay int64 = 0
-		var retryChan  <-chan int64 = nil
+		var retryChan <-chan int64 = nil
 
 		if conn != nil {
 			for nextRetryResp == nil {
@@ -245,7 +244,7 @@ func ProcessingLoop() {
 				if nil == nextRetryResp {
 					break
 				}
-				retryDelay = nextRetryResp.RetryTime - time.Nanoseconds()
+				retryDelay = nextRetryResp.RetryTime.Sub(time.Now())
 				if retryDelay < 0 {
 					sendResponse(conn, nextRetryResp)
 					nextRetryResp = nil
@@ -271,10 +270,10 @@ func ProcessingLoop() {
 		}
 		select {
 		// Currently executing job finishes.
-		case newresp := <- taskCompletionChan:
+		case newresp := <-taskCompletionChan:
 			o.Debug("job%d: Completed with State %s\n", newresp.id, newresp.State)
 			// preemptively set a retrytime.
-			newresp.RetryTime = time.Nanoseconds()
+			newresp.RetryTime = time.Now()
 			// ENOCONN - sub it in as our next retryresponse, and prepend the old one onto the queue.
 			if nil == conn {
 				if nil != nextRetryResp {
@@ -307,7 +306,7 @@ func ProcessingLoop() {
 
 			// start the reader
 			go Reader(conn)
-		
+
 			/* Introduce ourself */
 			p := o.MakeIdentifyClient(LocalHostname)
 			p.Send(conn)
@@ -327,12 +326,12 @@ func ProcessingLoop() {
 			}
 			var upkt interface{} = nil
 			if p.Length > 0 {
-				var err os.Error
+				var err error
 				upkt, err = p.Decode()
 				o.MightFail(err, "Couldn't decode packet from master")
 			}
 			handler, exists := dispatcher[p.Type]
-			if (exists) {
+			if exists {
 				connectDelay = 0
 				handler(conn, upkt)
 			} else {

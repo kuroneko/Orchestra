@@ -1,34 +1,34 @@
 /* wire.go
  *
  * Wire Level Encapsulation
-*/
+ */
 
-package orchestra;
+package orchestra
 
 import (
-	"os"
-	"net"
+	"errors"
 	"fmt"
+	"net"
 )
 
 type WirePkt struct {
-	Type	byte
-	Length	uint16
+	Type    byte
+	Length  uint16
 	Payload []byte
 }
 
 const (
-	TypeNop			= 0
-	TypeIdentifyClient	= 1
-	TypeReadyForTask	= 2
-	TypeTaskRequest		= 3
-	TypeTaskResponse	= 4
-	TypeAcknowledgement	= 5
+	TypeNop             = 0
+	TypeIdentifyClient  = 1
+	TypeReadyForTask    = 2
+	TypeTaskRequest     = 3
+	TypeTaskResponse    = 4
+	TypeAcknowledgement = 5
 )
 
 var (
-	ErrMalformedMessage = os.NewError("Malformed Message")
-	ErrUnknownMessage   = os.NewError("Unknown Message")
+	ErrMalformedMessage = errors.New("Malformed Message")
+	ErrUnknownMessage   = errors.New("Unknown Message")
 )
 
 func (p *WirePkt) ValidUnidentified() bool {
@@ -42,7 +42,7 @@ func (p *WirePkt) ValidUnidentified() bool {
 	return false
 }
 
-func (p *WirePkt) Send(c net.Conn) (n int, err os.Error) {
+func (p *WirePkt) Send(c net.Conn) (n int, err error) {
 	n = 0
 	preamble := make([]byte, 3)
 	preamble[0] = p.Type
@@ -50,12 +50,12 @@ func (p *WirePkt) Send(c net.Conn) (n int, err os.Error) {
 	preamble[2] = byte(p.Length & 0xFF)
 	ninc, err := c.Write(preamble)
 	n += ninc
-	if (err != nil) {
+	if err != nil {
 		return n, err
-	}	
+	}
 	ninc, err = c.Write(p.Payload[0:p.Length])
 	n += ninc
-	if (err != nil) {
+	if err != nil {
 		return n, err
 	}
 	return n, nil
@@ -75,7 +75,7 @@ func (p *WirePkt) Dump() {
 	fmt.Println()
 }
 
-func Receive(c net.Conn) (msg *WirePkt, err os.Error) {
+func Receive(c net.Conn) (msg *WirePkt, err error) {
 	msg = new(WirePkt)
 	preamble := make([]byte, 3)
 
@@ -104,4 +104,3 @@ func Receive(c net.Conn) (msg *WirePkt, err os.Error) {
 	/* Decode! */
 	return msg, nil
 }
-

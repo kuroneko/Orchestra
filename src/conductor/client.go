@@ -1,33 +1,32 @@
 /* client.go
  *
  * Client Handling
-*/
+ */
 
 package main
+
 import (
-	o "orchestra"
-	"net"
-	"time"
-	"os"
 	"crypto/tls"
 	"crypto/x509"
+	"net"
+	o "orchestra"
+	"time"
 )
 
 const (
-	KeepaliveDelay =	200e9 // once every 200 seconds.
-	RetryDelay     =  	10e9 // retry every 10 seconds.  Must be smaller than the keepalive to avoid channel race.
-	OutputQueueDepth =	10 // This needs to be large enough that we don't deadlock on ourself.
+	KeepaliveDelay   = 200e9 // once every 200 seconds.
+	RetryDelay       = 10e9  // retry every 10 seconds.  Must be smaller than the keepalive to avoid channel race.
+	OutputQueueDepth = 10    // This needs to be large enough that we don't deadlock on ourself.
 )
 
-
 type ClientInfo struct {
-	Player		string
-	PktOutQ		chan *o.WirePkt
-	PktInQ		chan *o.WirePkt
-	abortQ		chan int
-	TaskQ		chan *TaskRequest
-	connection	net.Conn
-	pendingTasks	map[uint64]*TaskRequest
+	Player       string
+	PktOutQ      chan *o.WirePkt
+	PktInQ       chan *o.WirePkt
+	abortQ       chan int
+	TaskQ        chan *TaskRequest
+	connection   net.Conn
+	pendingTasks map[uint64]*TaskRequest
 }
 
 func NewClientInfo() (client *ClientInfo) {
@@ -46,7 +45,7 @@ func (client *ClientInfo) Abort() {
 	if reg != nil {
 		reg.Disassociate()
 	}
-	client.abortQ <- 1;
+	client.abortQ <- 1
 }
 
 func (client *ClientInfo) Name() (name string) {
@@ -75,12 +74,12 @@ func (client *ClientInfo) SendTask(task *TaskRequest) {
 	p, err := o.Encode(tr)
 	o.MightFail(err, "Couldn't encode task for client.")
 	client.Send(p)
-	task.RetryTime = time.Nanoseconds() + RetryDelay
+	task.RetryTime = time.Now() + RetryDelay
 }
 
 func (client *ClientInfo) GotTask(task *TaskRequest) {
 	/* first up, look at the task state */
-	switch (task.State) {
+	switch task.State {
 	case TASK_QUEUED:
 		fallthrough
 	case TASK_PENDINGRESULT:
@@ -92,7 +91,7 @@ func (client *ClientInfo) GotTask(task *TaskRequest) {
 		// request a update to the spool so the PENDING flag is stored.
 		JobWriteUpdate(task.job.Id)
 	case TASK_FINISHED:
-		/* discard.  We don't care about tasks that are done. */		
+		/* discard.  We don't care about tasks that are done. */
 	}
 }
 
@@ -137,7 +136,7 @@ func handleIdentify(client *ClientInfo, message interface{}) {
 	ic, _ := message.(*o.IdentifyClient)
 	o.Info("Client %s: Identified Itself As \"%s\"", client.Name(), *ic.Hostname)
 	client.Player = *ic.Hostname
-	if (!HostAuthorised(client.Player)) {
+	if !HostAuthorised(client.Player) {
 		o.Warn("Client %s: Not Authorised.  Terminating Connection.", client.Name())
 		client.Abort()
 		return
@@ -152,9 +151,9 @@ func handleIdentify(client *ClientInfo, message interface{}) {
 		o.Debug("Checking Connection State")
 		cs := tlsc.ConnectionState()
 		vo := x509.VerifyOptions{
-		Roots: CACertPool,
-		Intermediates: intermediates,
-		DNSName: client.Player,
+			Roots:         CACertPool,
+			Intermediates: intermediates,
+			DNSName:       client.Player,
 		}
 		if cs.PeerCertificates == nil || cs.PeerCertificates[0] == nil {
 			o.Warn("Peer didn't provide a certificate. Aborting Connection.")
@@ -199,7 +198,7 @@ func handleIllegal(client *ClientInfo, message interface{}) {
 	client.Abort()
 }
 
-func handleResult(client *ClientInfo, message interface{}){
+func handleResult(client *ClientInfo, message interface{}) {
 	jr, _ := message.(*o.ProtoTaskResponse)
 	r := ResponseFromProto(jr)
 	// at this point in time, we only care about terminal
@@ -257,30 +256,28 @@ func handleResult(client *ClientInfo, message interface{}){
 				// update the job state.
 				JobReviewState(r.id)
 
-				client.pendingTasks[r.id] = nil, false
+				delete(client.pendingTasks, r.id)
 			}
 		}
 	}
 }
 
-
-var dispatcher	= map[uint8] func(*ClientInfo,interface{}) {
-	o.TypeNop:		handleNop,
-	o.TypeIdentifyClient:	handleIdentify,
-	o.TypeReadyForTask:	handleReadyForTask,
-	o.TypeTaskResponse:	handleResult,
+var dispatcher = map[uint8]func(*ClientInfo, interface{}){
+	o.TypeNop:            handleNop,
+	o.TypeIdentifyClient: handleIdentify,
+	o.TypeReadyForTask:   handleReadyForTask,
+	o.TypeTaskResponse:   handleResult,
 	/* C->P only messages, should never appear on the wire. */
-	o.TypeTaskRequest:	handleIllegal,
-
+	o.TypeTaskRequest: handleIllegal,
 }
 
-var loopFudge int64 = 10e6; /* 10 ms should be enough fudgefactor */
+var loopFudge int64 = 10e6 /* 10 ms should be enough fudgefactor */
 func clientLogic(client *ClientInfo) {
 	loop := true
 	for loop {
-		var	retryWait <-chan int64 = nil
-		var	retryTask *TaskRequest = nil
-		if (client.Player != "") {
+		var retryWait <-chan int64 = nil
+		var retryTask *TaskRequest = nil
+		if client.Player != "" {
 			var waitTime int64 = 0
 			var now int64 = 0
 			cleanPass := false
@@ -291,11 +288,11 @@ func clientLogic(client *ClientInfo) {
 				retryTask = nil
 				attempts++
 				cleanPass = true
-				now = time.Nanoseconds() + loopFudge
+				now = time.Now() + loopFudge
 				// if the client is correctly associated,
 				// evaluate all jobs for outstanding retries,
 				// and work out when our next retry is due.
-				for _,v := range client.pendingTasks {
+				for _, v := range client.pendingTasks {
 					if v.RetryTime < now {
 						client.SendTask(v)
 						cleanPass = false
@@ -307,11 +304,11 @@ func clientLogic(client *ClientInfo) {
 					}
 				}
 			}
-			if (attempts > 10) {
+			if attempts > 10 {
 				o.Fail("Couldn't find next timeout without restarting excessively.")
 			}
-			if (retryTask != nil) {
-				retryWait = time.After(waitTime-time.Nanoseconds())
+			if retryTask != nil {
+				retryWait = time.After(waitTime.Sub(time.Now()))
 			}
 		}
 		select {
@@ -324,9 +321,9 @@ func clientLogic(client *ClientInfo) {
 				client.Abort()
 				break
 			}
-			var upkt interface {} = nil
+			var upkt interface{} = nil
 			if p.Length > 0 {
-				var err os.Error
+				var err error
 
 				upkt, err = p.Decode()
 				if err != nil {
@@ -336,7 +333,7 @@ func clientLogic(client *ClientInfo) {
 				}
 			}
 			handler, exists := dispatcher[p.Type]
-			if (exists) {
+			if exists {
 				handler(client, upkt)
 			} else {
 				o.Warn("Unhandled Pkt Type %d", p.Type)
@@ -355,7 +352,7 @@ func clientLogic(client *ClientInfo) {
 			o.Debug("Sending Keepalive to %s", client.Name())
 			_, err := p.Send(client.connection)
 			if err != nil {
-				o.Warn("Error sending pkt to %s: %s.  Terminating Connection.", client.Name(), err)	
+				o.Warn("Error sending pkt to %s: %s.  Terminating Connection.", client.Name(), err)
 				client.Abort()
 			}
 		}
@@ -365,7 +362,6 @@ func clientLogic(client *ClientInfo) {
 
 func clientReceiver(client *ClientInfo) {
 	conn := client.connection
-
 
 	loop := true
 	for loop {

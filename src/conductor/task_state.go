@@ -2,15 +2,12 @@
 
 package main
 
-import (
-	"os"
-	"json"
-)
+import "encoding/json"
 
 type TaskState int
 
 const (
-	TASK_INVALID		= TaskState(iota)
+	TASK_INVALID = TaskState(iota)
 	// Task is fresh and has never been sent to the client.  It can be rescheduled still.
 	TASK_QUEUED
 	// Task has been transmitted at least once
@@ -33,7 +30,7 @@ func (ts TaskState) String() (strout string) {
 	return strout
 }
 
-func (ts TaskState) MarshalJSON() (out []byte, err os.Error) {
+func (ts TaskState) MarshalJSON() (out []byte, err error) {
 	strout := ts.String()
 	if strout != "" {
 		return json.Marshal(strout)
@@ -41,7 +38,7 @@ func (ts TaskState) MarshalJSON() (out []byte, err os.Error) {
 	return nil, InvalidValueError
 }
 
-func (ts *TaskState) UnmarshalJSON(in []byte) (err os.Error) {
+func (ts *TaskState) UnmarshalJSON(in []byte) (err error) {
 	var statestr string
 	err = json.Unmarshal(in, &statestr)
 	if err != nil {
