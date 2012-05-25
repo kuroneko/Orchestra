@@ -1,0 +1,10 @@
+all:	build
+
+build:	get
+	go install -a code.google.com/p/goprotobuf/proto
+	go install -a github.com/kuroneko/configureit
+
+get:
+	go get -u code.google.com/p/goprotobuf/proto
+	go get -u github.com/kuroneko/configureit
+

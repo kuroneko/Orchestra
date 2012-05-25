@@ -1,7 +1,7 @@
 #
 # version of Orchestra
 #
-VERSION=0.3.0
+VERSION=0.4.0
 
 #
 # packaging revision.
@@ -14,34 +14,40 @@ REVISION=1
 # build/source path, and not use the system directories.
 #
 GOPATH=$(PWD)/build-tree:$(PWD)
-GOINSTALL_FLAGS=-dashboard=false -clean=true -u=false -make=false
+#GOINSTALL_FLAGS=-dashboard=false -clean=true -u=false -make=false
 
 export GOPATH
 
 all: build
 
-build:	build-tree
-	goinstall $(GOINSTALL_FLAGS) conductor
-	goinstall $(GOINSTALL_FLAGS) player
-	goinstall $(GOINSTALL_FLAGS) submitjob
-	goinstall $(GOINSTALL_FLAGS) getstatus
+build:	build-tree.all
+	go install -a $(GOINSTALL_FLAGS) conductor
+	go install -a $(GOINSTALL_FLAGS) player
+	go install -a $(GOINSTALL_FLAGS) submitjob
+	go install -a $(GOINSTALL_FLAGS) getstatus
+
+build-tree.all:	build-tree
+	$(MAKE) -C build-tree -f ../Makefile.build-tree all GO_PATH=$(PWD)/build-tree
 
 build-tree:
 	mkdir -p build-tree/src
 	mkdir -p build-tree/bin
 	mkdir -p build-tree/pkg
-
+	
 clean:
 	-$(RM) -r build-tree/pkg
 	-$(RM) -r build-tree/bin
+	mkdir -p build-tree/pkg
+	mkdir -p build-tree/bin
 
 distclean:
 	-$(RM) -r build-tree
 
 ### NOTE:  Make sure the checkouts have the correct tags in the lines below!
-deps:	distclean build-tree
-	mkdir -p build-tree/src/github.com/kuroneko && cd build-tree/src/github.com/kuroneko && git clone http://github.com/kuroneko/configureit.git && cd configureit && git checkout v0.1
-	mkdir -p build-tree/src/goprotobuf.googlecode.com && cd build-tree/src/goprotobuf.googlecode.com && hg clone -r go.r60 http://goprotobuf.googlecode.com/hg
+deps:	distclean build-tree.get
+
+build-tree.get:	build-tree
+	$(MAKE) -C build-tree -f ../Makefile.build-tree get GO_PATH=$(PWD)/build-tree
 
 archive.deps:	deps
 	tar czf ../orchestra-deps-$(VERSION).tgz --transform 's!^!orchestra-$(VERSION)/!' --exclude .git --exclude .hg build-tree/src
