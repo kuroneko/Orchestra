@@ -53,7 +53,7 @@ func ServiceRequests() {
 			defer fh.Close()
 			fi, err := fh.Stat()
 			o.MightFail(err, "Couldn't stat CA certificate file: %s", filename)
-			data := make([]byte, fi.Size)
+			data := make([]byte, fi.Size())
 			fh.Read(data)
 			CACertPool.AppendCertsFromPEM(data)
 		}
@@ -77,8 +77,14 @@ func ServiceRequests() {
 		}
 	}
 
-	// ask the client to authenticate
-	sockConfig.AuthenticateClient = true
+	if *DontVerifyPeer {
+		sockConfig.ClientAuth = tls.NoClientCert
+	} else {
+		// ask the client to authenticate
+		sockConfig.ClientAuth = tls.RequireAndVerifyClientCert
+		// clients use the same certificate pool
+		sockConfig.ClientCAs = CACertPool
+	}
 
 	/* convert the bindAddress to a string suitable for the Listen call */
 	var laddr string

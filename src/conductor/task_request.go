@@ -4,6 +4,7 @@ package main
 
 import (
 	"sort"
+	"time"
 	o "orchestra"
 )
 
@@ -11,7 +12,7 @@ type TaskRequest struct {
 	job		*JobRequest
 	Player		string				`json:"player"`
 	State		TaskState			`json:"state"`
-	RetryTime	int64				`json:"retrytime"`
+	RetryTime	time.Time			`json:"retrytime"`
 }
 
 func NewTaskRequest() (tr *TaskRequest) {

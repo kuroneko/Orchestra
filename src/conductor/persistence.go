@@ -65,13 +65,13 @@ func loadLastId() {
 		lastId += IdCheckpointSafetySkip
 	} else {
 		pe, ok := err.(*os.PathError)
-		if !ok || pe.Error != os.ENOENT {
+		if !ok || pe.Err != os.ErrNotExist {
 			o.Fail("Found checkpoint file, but couldn't open it: %s", err)
 		}
 		fh, err := os.Open(savePath())
 		if err != nil {
 			pe, ok = err.(*os.PathError)
-			if !ok || pe.Error == os.ENOENT {
+			if !ok || pe.Err == os.ErrNotExist {
 				lastId = 0
 				return
 			}
@@ -167,17 +167,17 @@ func loadSpoolFiles(dirname string, depth int) {
 	o.MightFail(err, "Couldn't readdir on %s", dirname)
 	if depth > 0 {
 		for _, n := range nodes {
-			abspath := path.Join(dirname, n.Name)
-			if n.IsDirectory() {
+			abspath := path.Join(dirname, n.Name())
+			if (n.Mode() & os.ModeType) == os.ModeDir {
 				// if not a single character, it's not a spool node.
-				if len(n.Name) != 1 {
+				if len(n.Name()) != 1 {
 					continue
 				}
-				if n.Name == "." {
+				if n.Name() == "." {
 					// we're not interested in .
 					continue
 				}
-				nrunes := []int(n.Name)
+				nrunes := []rune(n.Name())
 				if unicode.Is(unicode.ASCII_Hex_Digit, nrunes[0]) {
 					loadSpoolFiles(abspath, depth-1)
 				} else {
@@ -188,13 +188,13 @@ func loadSpoolFiles(dirname string, depth int) {
 	} else {
 		// depth == 0 - only interested in files.
 		for _, n := range nodes {
-			abspath := path.Join(dirname, n.Name)
-			if n.IsRegular() {
-				if len(n.Name) != 16 {
+			abspath := path.Join(dirname, n.Name())
+			if n.Mode() & os.ModeType == 0 {
+				if len(n.Name()) != 16 {
 					shuffleToCorrupted(abspath, "Filename incorrect length")
 					continue
 				}
-				id, err := strconv.ParseUint(n.Name, 16, 64)
+				id, err := strconv.ParseUint(n.Name(), 16, 64)
 				if err != nil {
 					shuffleToCorrupted(abspath, "Invalid Filename")
 					continue

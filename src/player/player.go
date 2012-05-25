@@ -16,16 +16,16 @@ import (
 )
 
 const (
-	InitialReconnectDelay = 5e9
-	MaximumReconnectDelay = 300e9
+	InitialReconnectDelay = 5 * time.Second
+	MaximumReconnectDelay = 300 * time.Second
 	ReconnectDelayScale   = 2
-	KeepaliveDelay        = 200e9
-	RetryDelay            = 5e9
+	KeepaliveDelay        = 200 * time.Second
+	RetryDelay            = 5 * time.Second
 )
 
 type NewConnectionInfo struct {
 	conn    net.Conn
-	timeout int64
+	timeout time.Duration
 }
 
 var (
@@ -69,7 +69,7 @@ func getNextUnacknowledgedResponse() (resp *TaskResponse) {
 }
 
 func appendUnacknowledgedResponse(resp *TaskResponse) {
-	resp.RetryTime = time.Now() + RetryDelay
+	resp.RetryTime = time.Now().Add(RetryDelay)
 	unacknowledgedQueue.PushBack(resp)
 }
 
@@ -176,14 +176,13 @@ var dispatcher = map[uint8]func(net.Conn, interface{}){
 	o.TypeTaskResponse:   handleIllegal,
 }
 
-func connectMe(initialDelay int64) {
-	var backOff int64 = initialDelay
+func connectMe(initialDelay time.Duration) {
+	var backOff time.Duration = initialDelay
 	for {
 		// Sleep first.
 		if backOff > 0 {
 			o.Info("Sleeping for %d seconds", backOff/1e9)
-			err := time.Sleep(backOff)
-			o.MightFail(err, "Couldn't Sleep")
+			time.Sleep(backOff)
 			backOff *= ReconnectDelayScale
 			if backOff > MaximumReconnectDelay {
 				backOff = MaximumReconnectDelay
@@ -228,15 +227,15 @@ func ProcessingLoop() {
 	var conn net.Conn = nil
 	var nextRetryResp *TaskResponse = nil
 	var taskCompletionChan <-chan *TaskResponse = nil
-	var connectDelay int64 = 0
+	var connectDelay time.Duration
 	var doScoreReload bool = false
 	// kick off a new connection attempt.
 	go connectMe(connectDelay)
 
 	// and this is where we spin!
 	for {
-		var retryDelay int64 = 0
-		var retryChan <-chan int64 = nil
+		var retryDelay time.Duration = 0
+		var retryChan <-chan time.Time = nil
 
 		if conn != nil {
 			for nextRetryResp == nil {

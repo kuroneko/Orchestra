@@ -18,16 +18,19 @@ import (
 // three terminal signals, HUP, INT, TERM, we want to explicitly
 // handle.
 func signalHandler() {
-	for {
-		sig := <-signal.Incoming
+	incoming := make(chan os.Signal)
 
-		ux, ok := sig.(os.UnixSignal)
+	signal.Notify(incoming, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM)
+	for {
+		sig := <-incoming
+
+		ux, ok := sig.(syscall.Signal)
 		if !ok {
 			o.Warn("Couldn't handle signal %s, Coercion failed", sig)
 			continue
 		}
 
-		switch int(ux) {
+		switch ux {
 		case syscall.SIGHUP:
 			o.Warn("Reloading Configuration")
 			reloadScores <- 1

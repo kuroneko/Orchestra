@@ -7,15 +7,15 @@ package main
 
 import (
 	"crypto/tls"
-	"crypto/x509"
 	"net"
 	o "orchestra"
 	"time"
 )
 
 const (
-	KeepaliveDelay   = 200e9 // once every 200 seconds.
-	RetryDelay       = 10e9  // retry every 10 seconds.  Must be smaller than the keepalive to avoid channel race.
+	KeepaliveDelay   = 200 * time.Second // once every 200 seconds.
+	RetryDelay       = 10 * time.Second // retry every 10 seconds.  Must be smaller than the keepalive to avoid channel race.
+	DeadlockBreakDelay = 250 * time.Millisecond // break out after 250ms if we're potentially deadlocking to prevent stalling the retry queue for too long.
 	OutputQueueDepth = 10    // This needs to be large enough that we don't deadlock on ourself.
 )
 
@@ -74,7 +74,7 @@ func (client *ClientInfo) SendTask(task *TaskRequest) {
 	p, err := o.Encode(tr)
 	o.MightFail(err, "Couldn't encode task for client.")
 	client.Send(p)
-	task.RetryTime = time.Now() + RetryDelay
+	task.RetryTime = time.Now().Add(RetryDelay)
 }
 
 func (client *ClientInfo) GotTask(task *TaskRequest) {
@@ -145,36 +145,11 @@ func handleIdentify(client *ClientInfo, message interface{}) {
 	/* if we're TLS, verify the client's certificate given the name it used */
 	tlsc, ok := client.connection.(*tls.Conn)
 	if ok && !*DontVerifyPeer {
-		intermediates := x509.NewCertPool()
-
 		o.Debug("Connection is TLS.")
 		o.Debug("Checking Connection State")
 		cs := tlsc.ConnectionState()
-		vo := x509.VerifyOptions{
-			Roots:         CACertPool,
-			Intermediates: intermediates,
-			DNSName:       client.Player,
-		}
-		if cs.PeerCertificates == nil || cs.PeerCertificates[0] == nil {
-			o.Warn("Peer didn't provide a certificate. Aborting Connection.")
-			client.Abort()
-			return
-		}
-		// load any intermediate certificates from the chain
-		// into the intermediates pool so we can verify that
-		// the chain can be rebuilt.
-		//
-		// All we care is that we can reach an authorised CA.
-		//
-		//FIXME: Need CRL handling.
-		if len(cs.PeerCertificates) > 1 {
-			for i := 1; i < len(cs.PeerCertificates); i++ {
-				intermediates.AddCert(cs.PeerCertificates[i])
-			}
-		}
-		_, err := cs.PeerCertificates[0].Verify(vo)
-		if err != nil {
-			o.Warn("couldn't verify client certificate: %s", err)
+		if cs.ServerName != client.Player {
+			o.Warn("Client cert is for \"%s\" but identified as \"%s\".  Aborting Connection.", cs.ServerName, client.Player);
 			client.Abort()
 			return
 		}
@@ -271,33 +246,58 @@ var dispatcher = map[uint8]func(*ClientInfo, interface{}){
 	o.TypeTaskRequest: handleIllegal,
 }
 
-var loopFudge int64 = 10e6 /* 10 ms should be enough fudgefactor */
+var loopFudge time.Duration = 10 * time.Millisecond /* 10 ms should be enough fudgefactor */
+
+//
+// The client main-loop performs the upkeep of client state and tasks.
+//
 func clientLogic(client *ClientInfo) {
 	loop := true
 	for loop {
-		var retryWait <-chan int64 = nil
+		var retryWait <-chan time.Time = nil
 		var retryTask *TaskRequest = nil
+
+		// First up, if our connection has completed handshaking
+		// (Player is set and, as such, pendingTasks is valid)
+		// we look through the pending tasks list for the first job 
+		// due.
+		//
+		// If we find a job due, we set a timeout (via retryWait)
+		// which will bail out the select loop early so we can do 
+		// the next retry round.
+		//
+		// The processing of events won't start until we've been
+		// able to scan the entire pendingTask list and no retries 
+		// were overdue.  A simple attempt limit (currently 10)
+		// guards against the worse case that we can't scan the list
+		// before another task expires infiniately - after 10 failed
+		// attempts we'll set an arbitrary timeout and wait for 
+		// events to try to break any perfect-races.
+		//
+		// At the end of this logic, if there was a pending task that 
+		// was going to require notification, retryTask is set, and
+		// waitTime is set appropriately.
 		if client.Player != "" {
-			var waitTime int64 = 0
-			var now int64 = 0
+			var waitTime	time.Time
+			var now 	time.Time
 			cleanPass := false
 			attempts := 0
 			for !cleanPass && attempts < 10 {
 				/* reset our state for the pass */
-				waitTime = 0
 				retryTask = nil
 				attempts++
 				cleanPass = true
-				now = time.Now() + loopFudge
+				now = time.Now().Add(loopFudge)
 				// if the client is correctly associated,
 				// evaluate all jobs for outstanding retries,
 				// and work out when our next retry is due.
 				for _, v := range client.pendingTasks {
-					if v.RetryTime < now {
+					if v.RetryTime.Before(now) {
+						// SendTask will reset the retry-time
 						client.SendTask(v)
 						cleanPass = false
 					} else {
-						if waitTime == 0 || v.RetryTime < waitTime {
+						if retryTask == nil || v.RetryTime.Before(waitTime) {
 							retryTask = v
 							waitTime = v.RetryTime
 						}
@@ -305,15 +305,22 @@ func clientLogic(client *ClientInfo) {
 				}
 			}
 			if attempts > 10 {
-				o.Fail("Couldn't find next timeout without restarting excessively.")
-			}
-			if retryTask != nil {
-				retryWait = time.After(waitTime.Sub(time.Now()))
+				o.Warn("Couldn't find next timeout without restarting excessively - processing events anyway")
+				if retryWait == nil {
+					retryWait = time.After(DeadlockBreakDelay)
+					retryTask = nil
+				}
+			} else {
+				if retryTask != nil {
+					retryWait = time.After(waitTime.Sub(now))
+				}
 			}
 		}
 		select {
 		case <-retryWait:
-			client.SendTask(retryTask)
+			if retryTask != nil {
+				client.SendTask(retryTask)
+			}
 		case p := <-client.PktInQ:
 			/* we've received a packet.  do something with it. */
 			if client.Player == "" && p.Type != o.TypeIdentifyClient {

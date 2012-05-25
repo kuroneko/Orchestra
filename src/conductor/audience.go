@@ -48,7 +48,6 @@ func NewJsonPlayerStatus() (jps *JsonPlayerStatus) {
 func handleAudienceRequest(c net.Conn) {
 	defer c.Close()
 
-	c.SetTimeout(0)
 	r, _ := c.(io.Reader)
 	w, _ := c.(io.Writer)
 	dec := json.NewDecoder(r)
@@ -181,7 +180,8 @@ func AudienceListener(l net.Listener) {
 func UnixAudienceListener(sockaddr string) {
 	fi, err := os.Stat(sockaddr)
 	if err == nil {
-		if fi.IsSocket() {
+		fmode := fi.Mode()
+		if fmode & os.ModeType == os.ModeSocket {
 			o.Warn("Removing stale socket at %s", sockaddr)
 			os.Remove(sockaddr)
 		} else {
