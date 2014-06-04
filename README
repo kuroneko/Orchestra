@@ -1,4 +1,4 @@
-A 5 Minute Guide to Orcehstra
+A 5 Minute Guide to Orchestra
 -----------------------------
 
 What is it?
@@ -23,6 +23,7 @@ License
 =======
 
 Copyright (c) 2011, Anchor Systems Pty Ltd
+Copyright (c) 2014, Christopher Collins
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -51,8 +52,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 Building
 ========
 
-Install the Go Release 59 compiler.  Prior to compilation, apply the
-patches in go-patches/ in order to fix a few package bugs.
+Install the 'gc' (upstream) Go compiler.
 
 From the top level directory, run make.  It will use goinstall to
 build the binaries in bin/
@@ -70,10 +70,6 @@ samples/ -- Sample configuration files.
 clientlibs/ -- Sample client libraries for communicating with the
 	       Conductor as the Audience.
 
-go-patches/ -- Patches against the Release version of Go to fix
-	       critical bugs or missing features encountered when
-	       implementing Orchestra
-
 Patches Included
 ================
 
@@ -83,6 +79,9 @@ Patches Included
 
 New In This Release
 ===================
+v0.5.0:
+ * Gutted Protobuf and replaced it with BSON
+ * Updated to build against a post version1 release of Go
 
 v0.3.0:
  * BUGFIX: Fixed conductor ignoring the last_id checkpoint file after
@@ -100,6 +99,7 @@ v0.2.0:
 
 Known Issues
 ============
+ * logging will break (stop logging) when syslog restarts.
 
  * There is no clean up of job data, or persistance of results at this
    time.  This is intended to be implemented as soon as time permits.

@@ -1,10 +1,10 @@
 all:	build
 
 build:	get
-	go install code.google.com/p/goprotobuf/proto
 	go install github.com/kuroneko/configureit
+	go install labix.org/v2/mgo/bson
 
 get:
-	go get -u code.google.com/p/goprotobuf/proto
 	go get -u github.com/kuroneko/configureit
+	go get -u labix.org/v2/mgo/bson
 

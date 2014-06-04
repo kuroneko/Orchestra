@@ -22,12 +22,11 @@ func NewTaskRequest() (tr *TaskRequest) {
 	return tr
 }
 
-func (task *TaskRequest) Encode() (ptr *o.ProtoTaskRequest) {
-	ptr = new(o.ProtoTaskRequest)
-	ptr.Jobname = &task.job.Score
-	ptr.Id = new(uint64)
-	*ptr.Id = task.job.Id
-	ptr.Parameters = o.ProtoJobParametersFromMap(task.job.Params)
+func (task *TaskRequest) Encode() (ptr *o.TaskRequest) {
+	ptr = new(o.TaskRequest)
+	ptr.JobName = task.job.Score
+	ptr.Id = task.job.Id
+	ptr.Parameters = o.CopyMap(task.job.Params)
 
 	return ptr
 }

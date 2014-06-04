@@ -21,6 +21,7 @@ const (
 	ReconnectDelayScale   = 2
 	KeepaliveDelay        = 200 * time.Second
 	RetryDelay            = 5 * time.Second
+	PlayerVersion		  = "OrchestraPlayer/0.5.0"
 )
 
 type NewConnectionInfo struct {
@@ -128,9 +129,9 @@ func handleIllegal(c net.Conn, message interface{}) {
 
 func handleRequest(c net.Conn, message interface{}) {
 	o.Debug("Request Recieved.  Decoding!")
-	ptr, ok := message.(*o.ProtoTaskRequest)
+	ptr, ok := message.(*o.TaskRequest)
 	if !ok {
-		o.Assert("CC stuffed up - handleRequest got something that wasn't a ProtoTaskRequest.")
+		o.Assert("CC stuffed up - handleRequest got something that wasn't a TaskRequest.")
 	}
 	task := TaskFromProto(ptr)
 	/* search the registry for the task */
@@ -156,13 +157,11 @@ func handleRequest(c net.Conn, message interface{}) {
 
 func handleAck(c net.Conn, message interface{}) {
 	o.Debug("Ack Received")
-	ack, ok := message.(*o.ProtoAcknowledgement)
+	ack, ok := message.(*o.Acknowledgement)
 	if !ok {
 		o.Assert("CC stuffed up - handleAck got something that wasn't a ProtoAcknowledgement.")
 	}
-	if ack.Id != nil {
-		acknowledgeResponse(*ack.Id)
-	}
+	acknowledgeResponse(ack.Id)
 }
 
 var dispatcher = map[uint8]func(net.Conn, interface{}){
@@ -307,7 +306,7 @@ func ProcessingLoop() {
 			go Reader(conn)
 
 			/* Introduce ourself */
-			p := o.MakeIdentifyClient(LocalHostname)
+			p := o.MakeIdentifyClient(LocalHostname, PlayerVersion)
 			p.Send(conn)
 		// Lost connection.  Shut downt he connection.
 		case <-lostConnection:

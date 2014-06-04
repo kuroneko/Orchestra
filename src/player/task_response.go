@@ -37,52 +37,51 @@ func (resp *TaskResponse) CanRetry() bool {
 }
 
 
-func ResponseFromProto(ptr *o.ProtoTaskResponse) (r *TaskResponse) {
+func ResponseFromProto(ptr *o.TaskResponse) (r *TaskResponse) {
 	r = new(TaskResponse)
 
-	switch (*(ptr.Status)) {
-	case o.ProtoTaskResponse_JOB_INPROGRESS:
+	switch (ptr.Status) {
+	case o.TaskStatus_InProgress:
 		r.State = RESP_RUNNING
-	case o.ProtoTaskResponse_JOB_SUCCESS:
+	case o.TaskStatus_Success:
 		r.State = RESP_FINISHED
-	case o.ProtoTaskResponse_JOB_FAILED:
+	case o.TaskStatus_Failed:
 		r.State = RESP_FAILED
-	case o.ProtoTaskResponse_JOB_HOST_FAILURE:
+	case o.TaskStatus_HostFailure:
 		r.State = RESP_FAILED_HOST_ERROR
-	case o.ProtoTaskResponse_JOB_UNKNOWN:
+	case o.TaskStatus_Unknown:
 		r.State = RESP_FAILED_UNKNOWN_SCORE
-	case o.ProtoTaskResponse_JOB_UNKNOWN_FAILURE:
+	case o.TaskStatus_UnknownFailure:
 		fallthrough
 	default:
 		r.State = RESP_FAILED_UNKNOWN
 	}
 
-	r.id = *(ptr.Id)
-	r.Response = o.MapFromProtoJobParameters(ptr.Response)
+	r.id = ptr.Id
+	r.Response = o.CopyMap(ptr.Response)
 
 	return r
 }
 
-func (resp *TaskResponse) Encode() (ptr *o.ProtoTaskResponse) {
-	ptr = new(o.ProtoTaskResponse)
+func (resp *TaskResponse) Encode() (ptr *o.TaskResponse) {
+	ptr = new(o.TaskResponse)
 	
 	switch resp.State {
 	case RESP_RUNNING:
-		ptr.Status = o.NewProtoTaskResponse_TaskStatus(o.ProtoTaskResponse_JOB_INPROGRESS)
+		ptr.Status = o.TaskStatus_InProgress
 	case RESP_FINISHED:
-		ptr.Status = o.NewProtoTaskResponse_TaskStatus(o.ProtoTaskResponse_JOB_SUCCESS)
+		ptr.Status = o.TaskStatus_Success
 	case RESP_FAILED:
-		ptr.Status = o.NewProtoTaskResponse_TaskStatus(o.ProtoTaskResponse_JOB_FAILED)
+		ptr.Status = o.TaskStatus_Failed
 	case RESP_FAILED_UNKNOWN_SCORE:
-		ptr.Status = o.NewProtoTaskResponse_TaskStatus(o.ProtoTaskResponse_JOB_UNKNOWN)
+		ptr.Status = o.TaskStatus_Unknown
 	case RESP_FAILED_HOST_ERROR:
-		ptr.Status = o.NewProtoTaskResponse_TaskStatus(o.ProtoTaskResponse_JOB_HOST_FAILURE)
+		ptr.Status = o.TaskStatus_HostFailure
 	case RESP_FAILED_UNKNOWN:
-		ptr.Status = o.NewProtoTaskResponse_TaskStatus(o.ProtoTaskResponse_JOB_UNKNOWN_FAILURE)
+		ptr.Status = o.TaskStatus_UnknownFailure
 	}
-	ptr.Id = new(uint64)
-	*ptr.Id = resp.id
-	ptr.Response = o.ProtoJobParametersFromMap(resp.Response)
+	ptr.Id = resp.id
+	ptr.Response = o.CopyMap(resp.Response)
 
 	return ptr
 }

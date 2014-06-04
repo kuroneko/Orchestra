@@ -6,7 +6,7 @@
 package orchestra
 
 import (
-	"code.google.com/p/goprotobuf/proto"
+	"labix.org/v2/mgo/bson"
 	"errors"
 )
 
@@ -15,35 +15,9 @@ var (
 	ErrObjectTooLarge = errors.New("Encoded Object exceeds maximum encoding size")
 )
 
-/* ugh ugh ugh.  As much as I love protocol buffers, not having maps
- * as a native type is a PAIN IN THE ASS.
- *
- * Here's some common code to convert my K/V format in protocol
- * buffers to and from native Go structures.
- */
-func MapFromProtoJobParameters(parray []*ProtoJobParameter) (mapparam map[string]string) {
-	mapparam = make(map[string]string)
-
-	for p := range parray {
-		mapparam[*(parray[p].Key)] = *(parray[p].Value)
-	}
-
-	return mapparam
-}
-
-func ProtoJobParametersFromMap(mapparam map[string]string) (parray []*ProtoJobParameter) {
-	parray = make([]*ProtoJobParameter, len(mapparam))
-	i := 0
-	for k, v := range mapparam {
-		arg := new(ProtoJobParameter)
-		arg.Key = proto.String(k)
-		arg.Value = proto.String(v)
-		parray[i] = arg
-		i++
-	}
-
-	return parray
-}
+const (
+	MaximumPayloadSize = 0x10000
+)
 
 func (p *WirePkt) Decode() (obj interface{}, err error) {
 	switch p.Type {
@@ -55,7 +29,7 @@ func (p *WirePkt) Decode() (obj interface{}, err error) {
 		return nil, nil
 	case TypeIdentifyClient:
 		ic := new(IdentifyClient)
-		err := proto.Unmarshal(p.Payload[0:p.Length], ic)
+		err := bson.Unmarshal(p.Payload[0:p.Length], ic)
 		if err != nil {
 			return nil, err
 		}
@@ -67,22 +41,22 @@ func (p *WirePkt) Decode() (obj interface{}, err error) {
 		}
 		return nil, nil
 	case TypeTaskRequest:
-		tr := new(ProtoTaskRequest)
-		err := proto.Unmarshal(p.Payload[0:p.Length], tr)
+		tr := new(TaskRequest)
+		err := bson.Unmarshal(p.Payload[0:p.Length], tr)
 		if err != nil {
 			return nil, err
 		}
 		return tr, nil
 	case TypeTaskResponse:
-		tr := new(ProtoTaskResponse)
-		err := proto.Unmarshal(p.Payload[0:p.Length], tr)
+		tr := new(TaskResponse)
+		err := bson.Unmarshal(p.Payload[0:p.Length], tr)
 		if err != nil {
 			return nil, err
 		}
 		return tr, nil
 	case TypeAcknowledgement:
-		tr := new(ProtoAcknowledgement)
-		err := proto.Unmarshal(p.Payload[0:p.Length], tr)
+		tr := new(Acknowledgement)
+		err := bson.Unmarshal(p.Payload[0:p.Length], tr)
 		if err != nil {
 			return nil, err
 		}
@@ -96,21 +70,21 @@ func Encode(obj interface{}) (p *WirePkt, err error) {
 	switch obj.(type) {
 	case *IdentifyClient:
 		p.Type = TypeIdentifyClient
-	case *ProtoTaskRequest:
+	case *TaskRequest:
 		p.Type = TypeTaskRequest
-	case *ProtoTaskResponse:
+	case *TaskResponse:
 		p.Type = TypeTaskResponse
-	case *ProtoAcknowledgement:
+	case *Acknowledgement:
 		p.Type = TypeAcknowledgement
 	default:
 		Warn("Encoding unknown type!")
 		return nil, ErrUnknownType
 	}
-	p.Payload, err = proto.Marshal(obj)
+	p.Payload, err = bson.Marshal(obj)
 	if err != nil {
 		return nil, err
 	}
-	if len(p.Payload) >= 0x10000 {
+	if len(p.Payload) >= MaximumPayloadSize {
 		return nil, ErrObjectTooLarge
 	}
 	p.Length = uint16(len(p.Payload))
@@ -127,9 +101,10 @@ func MakeNop() (p *WirePkt) {
 	return p
 }
 
-func MakeIdentifyClient(hostname string) (p *WirePkt) {
+func MakeIdentifyClient(hostname, clientid string) (p *WirePkt) {
 	s := new(IdentifyClient)
-	s.Hostname = proto.String(hostname)
+	s.Hostname = hostname
+	s.ClientId = clientid
 
 	p, _ = Encode(s)
 
@@ -147,11 +122,9 @@ func MakeReadyForTask() (p *WirePkt) {
 
 /* We use the failure code for negative acknowledgements */
 func MakeNack(id uint64) (p *WirePkt) {
-	a := new(ProtoAcknowledgement)
-	a.Id = proto.Uint64(id)
-	a.Response = new(ProtoAcknowledgement_AckType)
-	*(a.Response) = ProtoAcknowledgement_ACK_ERROR
-
+	a := new(Acknowledgement)
+	a.Id = id
+	a.Response = AckType_Error
 	p, _ = Encode(a)
 
 	return p
@@ -159,11 +132,9 @@ func MakeNack(id uint64) (p *WirePkt) {
 
 // Construct a positive ACK for transmission
 func MakeAck(id uint64) (p *WirePkt) {
-	a := new(ProtoAcknowledgement)
-	a.Id = proto.Uint64(id)
-	a.Response = new(ProtoAcknowledgement_AckType)
-	*(a.Response) = ProtoAcknowledgement_ACK_OK
-
+	a := new(Acknowledgement)
+	a.Id = id
+	a.Response = AckType_OK
 	p, _ = Encode(a)
 
 	return p

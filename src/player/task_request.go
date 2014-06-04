@@ -21,12 +21,12 @@ func NewTaskRequest() (req *TaskRequest) {
 
 /* Map a wire task to an internal Task Request.
 */
-func TaskFromProto(ptr *o.ProtoTaskRequest) (t *TaskRequest) {
+func TaskFromProto(ptr *o.TaskRequest) (t *TaskRequest) {
 	t = NewTaskRequest()
 	
-	t.Score = *(ptr.Jobname)
-	t.Id = *(ptr.Id)
-	t.Params = o.MapFromProtoJobParameters(ptr.Parameters)
+	t.Score = ptr.JobName
+	t.Id = ptr.Id
+	t.Params = o.CopyMap(ptr.Parameters)
 
 	return t
 }

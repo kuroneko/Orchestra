@@ -134,12 +134,15 @@ func handleIdentify(client *ClientInfo, message interface{}) {
 		return
 	}
 	ic, _ := message.(*o.IdentifyClient)
-	o.Info("Client %s: Identified Itself As \"%s\"", client.Name(), *ic.Hostname)
-	client.Player = *ic.Hostname
+	o.Info("Client %s: Identified Itself As \"%s\"", client.Name(), ic.Hostname)
+	client.Player = ic.Hostname
 	if !HostAuthorised(client.Player) {
 		o.Warn("Client %s: Not Authorised.  Terminating Connection.", client.Name())
 		client.Abort()
 		return
+	}
+	if (ic.ClientId != "") {
+		o.Info("Client %s: Client Version \"%s\"", client.Name(), ic.ClientId)
 	}
 
 	/* if we're TLS, verify the client's certificate given the name it used */
@@ -174,7 +177,7 @@ func handleIllegal(client *ClientInfo, message interface{}) {
 }
 
 func handleResult(client *ClientInfo, message interface{}) {
-	jr, _ := message.(*o.ProtoTaskResponse)
+	jr, _ := message.(*o.TaskResponse)
 	r := ResponseFromProto(jr)
 	// at this point in time, we only care about terminal
 	// condition codes.  a Job that isn't finished is just

@@ -34,28 +34,28 @@ func (resp *TaskResponse) CanRetry() bool {
 }
 
 
-func ResponseFromProto(ptr *o.ProtoTaskResponse) (r *TaskResponse) {
+func ResponseFromProto(ptr *o.TaskResponse) (r *TaskResponse) {
 	r = new(TaskResponse)
 
-	switch (*(ptr.Status)) {
-	case o.ProtoTaskResponse_JOB_INPROGRESS:
+	switch (ptr.Status) {
+	case o.TaskStatus_InProgress:
 		r.State = RESP_RUNNING
-	case o.ProtoTaskResponse_JOB_SUCCESS:
+	case o.TaskStatus_Success:
 		r.State = RESP_FINISHED
-	case o.ProtoTaskResponse_JOB_FAILED:
+	case o.TaskStatus_Failed:
 		r.State = RESP_FAILED
-	case o.ProtoTaskResponse_JOB_HOST_FAILURE:
+	case o.TaskStatus_HostFailure:
 		r.State = RESP_FAILED_HOST_ERROR
-	case o.ProtoTaskResponse_JOB_UNKNOWN:
+	case o.TaskStatus_Unknown:
 		r.State = RESP_FAILED_UNKNOWN_SCORE
-	case o.ProtoTaskResponse_JOB_UNKNOWN_FAILURE:
+	case o.TaskStatus_UnknownFailure:
 		fallthrough
 	default:
 		r.State = RESP_FAILED_UNKNOWN
 	}
 
-	r.id = *(ptr.Id)
-	r.Response = o.MapFromProtoJobParameters(ptr.Response)
+	r.id = ptr.Id
+	r.Response = o.CopyMap(ptr.Response)
 
 	return r
 }
