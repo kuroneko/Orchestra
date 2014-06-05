@@ -54,7 +54,7 @@ Building
 
 Install the 'gc' (upstream) Go compiler.
 
-From the top level directory, run make.  It will use goinstall to
+From the top level directory, run make.  It will use go install to
 build the binaries in bin/
 
 Source Layout

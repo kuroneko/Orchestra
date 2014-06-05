@@ -1,3 +1,10 @@
+orchestra (0.5.0-0kuroneko1) unstable; urgency=low
+
+  * Update to go v1.2
+  * Update to upstream pre-0.5.0
+
+ -- Chris Collins <kuroneko@sysadninjas.net>  Thu, 05 Jun 2014 13:25:09 +1000
+
 orchestra (0.3.0-0anchor1) unstable; urgency=low
 
   * Update to golang r60.

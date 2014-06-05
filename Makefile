@@ -50,7 +50,7 @@ build-tree.get:	build-tree
 	$(MAKE) -C build-tree -f ../Makefile.build-tree get GO_PATH=$(PWD)/build-tree
 
 archive.deps:	deps
-	tar czf ../orchestra-deps-$(VERSION).tgz --transform 's!^!orchestra-$(VERSION)/!' --exclude .git --exclude .hg build-tree/src
+	tar czf ../orchestra-deps-$(VERSION).tgz --transform 's!^!orchestra-$(VERSION)/!' --exclude .git --exclude .hg --exclude .bzr build-tree/src
 
 archive.release:	archive.deps
 	git archive --format=tar --prefix=orchestra-$(VERSION)/ v$(VERSION) | gzip -9c > ../orchestra-$(VERSION).tgz
@@ -73,4 +73,4 @@ debian.debian:
 	tar zcf ../orchestra_$(DEBIAN_VERSION).debian.tar.gz -C debian .
 
 debian.build-tree:	deps
-	tar zcf ../orchestra_$(DEBIAN_SRC_VERSION).orig-build-tree.tar.gz -C build-tree --exclude .git --exclude .hg .
+	tar zcf ../orchestra_$(DEBIAN_SRC_VERSION).orig-build-tree.tar.gz -C build-tree --exclude .git --exclude .hg --exclude .bzr .
